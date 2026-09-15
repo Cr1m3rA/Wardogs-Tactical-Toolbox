@@ -120,6 +120,12 @@ const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
 } else {
+  /* 纯 2D 地图应用：固定禁用 GPU 加速 + GPU 进程内嵌，
+     虚拟机 / 远程桌面 / 无显卡环境下也不会白屏崩溃 */
+  app.disableHardwareAcceleration();
+  app.commandLine.appendSwitch('disable-gpu');
+  app.commandLine.appendSwitch('in-process-gpu');
+
   app.on('second-instance', showMain);
 
   app.whenReady().then(() => {

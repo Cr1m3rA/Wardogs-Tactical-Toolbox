@@ -60,6 +60,7 @@ npm start
 
 - 渲染层在 `app/renderer/`：`engine.js`（数学/瓦片/画布引擎，与 DOM 解耦）+ `app.js`（Shoelace UI）+ `app.css`（设计系统）
 - 主进程注册了 `app://` 自定义协议加载渲染层（ESM import map 本地解析 lit 等运行时依赖，全部离线）
+- `renderer/vendor/`（约 14MB 组件库）**不入库**：`npm install` 时由 `postinstall` 钩子自动从 node_modules 重建
 - 与网页版共用同一个 localStorage 存档键，网页版放的标记桌面版直接继承
 
 ### 打包单文件程序（可选）

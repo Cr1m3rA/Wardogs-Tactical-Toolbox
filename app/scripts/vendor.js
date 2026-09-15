@@ -7,7 +7,7 @@ const appDir = path.join(__dirname, '..');
 const nm = path.join(appDir, 'node_modules');
 const out = path.join(appDir, 'renderer', 'vendor');
 
-fs.rmSync(out, { recursive: true, force: true });
+/* 覆盖式同步：不删除旧树（删 thousands of files 可能触发安全策略），同名文件直接覆盖 */
 fs.mkdirSync(out, { recursive: true });
 
 function cp(src, dest) {
