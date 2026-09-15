@@ -18,11 +18,37 @@ import './vendor/shoelace/components/textarea/textarea.js';
 import './vendor/shoelace/components/icon/icon.js';
 
 import {
-  createEngine, TBL, MIN_R, MAX_R, MAPS,
-  rangeToMil, solveVector, fx, fm0, faz, parseNum, parsePair, distM, poisOf,
+  createEngine, WEAPONS, arcSolutions, MAPS,
+  solveVector, fx, fm0, faz, parseNum, parsePair, distM, poisOf,
   BUILD_CATALOG, BUILD_PRESETS, FOB_RADIUS, UNIT_PRICE, PALLET, UNIT_KG,
-  MARK_COLORS, RADIUS_PRESETS, SRC_SEQ, SRC_TXT,
+  MARK_COLORS, markCss, RADIUS_PRESETS, SRC_SEQ, SRC_TXT,
 } from './engine.js';
+import { icon } from './icons.js';
+import {
+  IS_TAURI, mapDataCard, bindMapData, refreshMapData, onProgress, probe,
+} from './desktop.js';
+
+/* ---------- 当前武器的便捷读取 ----------
+   射程和射表都随武器变（L81 132–684 m，SPH-2 780–2629 m），
+   所以不能再有常量 MIN_R / MAX_R，一律走这里。 */
+const CW = () => E.weapon();
+const CA = () => E.arc();
+/* 给距离，返回该武器当前选中弹道弧的密位；无解返回 null */
+function milAt(d, w = CW(), arc = CA()){
+  const sol = arcSolutions(w, d).find(a => a.key === arc.key);
+  return sol ? sol.mil : null;
+}
+/* 该距离上共有几条弹道可用（>1 表示低/高弹道都能打） */
+const nSol = (d, w = CW()) => arcSolutions(w, d).length;
+/* 密位与射程的增减方向随弹道弧而变，说反了会把人带沟里：
+   迫击炮 950→120、SPH-2 高弹道 1400→610 都是「密位调小打得更远」，
+   唯独 SPH-2 低弹道 20→600 相反。用表首末密位判断，别写死。 */
+function milHint(){
+  const t = CA().tbl;
+  return t[t.length-1][1] > t[0][1]
+    ? '<b>密位调大 = 打得更远</b>'
+    : '<b>密位调小 = 打得更远</b>';
+}
 
 /* ---------- 环境 ---------- */
 const qs = new URLSearchParams(location.search);
@@ -33,9 +59,39 @@ const $ = id => document.getElementById(id);
 
 /* ---------- 引擎 ---------- */
 const canvas = $(isOverlay ? 'mapOv' : 'map');
+
+/* ---------- 指针坐标浮标 ----------
+   指针在地图上时，在指针附近实时显示所在坐标（1 格 = 100 m）。
+   主窗与悬浮窗共用一份：浮标挂在各自 canvas 的定位父元素里。
+   主窗另外在左栏常驻一行同样的读数，这里两处都更新。 */
+const cursorTip = document.createElement('div');
+cursorTip.className = 'cursor-tip';
+cursorTip.hidden = true;
+canvas.parentElement.appendChild(cursorTip);
+
+function onCursor(w, px, py){
+  const coord = $('cursorCoord');
+  if (!w){
+    cursorTip.hidden = true;
+    if (coord) coord.textContent = 'X — / Y —';
+    return;
+  }
+  const txt = `X ${fx(w.x)}  Y ${fx(w.y)}`;
+  if (coord) coord.textContent = `X ${fx(w.x)} / Y ${fx(w.y)}`;
+  cursorTip.textContent = txt;
+  cursorTip.style.left = px + 'px';
+  cursorTip.style.top  = py + 'px';
+  /* 贴到右/下边缘时翻到指针另一侧，免得浮标被视口切掉 */
+  const r = canvas.getBoundingClientRect();
+  const dx = px > r.width  - 132 ? 'calc(-100% - 13px)' : '13px';
+  const dy = py > r.height - 34  ? 'calc(-100% - 13px)' : '13px';
+  cursorTip.style.transform = `translate(${dx}, ${dy})`;
+  cursorTip.hidden = false;
+}
+
 const E = createEngine(canvas, {
   onFlash: toast,
-  onCursor: w => { $('cursorCoord').textContent = `X ${fx(w.x)} / Y ${fx(w.y)}`; },
+  onCursor,
   onChange: scheduleRender,
 });
 
@@ -43,7 +99,8 @@ const E = createEngine(canvas, {
 function toast(msg){
   const a = document.createElement('sl-alert');
   a.variant = 'primary'; a.closable = true; a.duration = 2200;
-  a.textContent = msg;
+  // innerHTML：msg 全部来自本文件内的字面量或数字拼接，无外部输入
+  a.innerHTML = msg;
   document.body.append(a);
   a.toast();
 }
@@ -60,17 +117,17 @@ function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
 
 /* ---------- 导航 ---------- */
 const NAV = [
-  {id:'solve',    ic:'🎯', label:'算诸元'},
-  {id:'predict',  ic:'📮', label:'推落点'},
-  {id:'correct',  ic:'🔧', label:'修偏差'},
-  {id:'tools',    ic:'🧰', label:'工具'},
-  {id:'intel',    ic:'📡', label:'情报'},
-  {id:'build',    ic:'🏗️', label:'建造'},
-  {id:'table',    ic:'📖', label:'射表'},
-  {id:'settings', ic:'⚙️', label:'数据'},
+  {id:'solve',    ic:'crosshair',          label:'算诸元'},
+  {id:'predict',  ic:'map-pin-plus',       label:'推落点'},
+  {id:'correct',  ic:'sliders-horizontal', label:'修偏差'},
+  {id:'tools',    ic:'wrench',             label:'工具'},
+  {id:'intel',    ic:'radar',              label:'情报'},
+  {id:'build',    ic:'hard-hat',           label:'建造'},
+  {id:'table',    ic:'book-open',          label:'射表'},
+  {id:'settings', ic:'settings',           label:'数据'},
 ];
 $('nav').innerHTML = NAV.map(n =>
-  `<button class="nav-btn" data-mode="${n.id}" type="button"><span class="ic">${n.ic}</span>${n.label}</button>`).join('');
+  `<button class="nav-btn" data-mode="${n.id}" type="button"><span class="ic">${icon(n.ic)}</span>${n.label}</button>`).join('');
 $('nav').querySelectorAll('.nav-btn').forEach(b => b.addEventListener('click', () => {
   E.setMode(b.dataset.mode); E.compute(); E.draw(); E.save(); scheduleRender();
 }));
@@ -81,7 +138,14 @@ $('mapSel').innerHTML = Object.values(MAPS).map(m =>
 $('srcSel').innerHTML = SRC_SEQ.map(s =>
   `<sl-option value="${s}">底图·${SRC_TXT[s]}</sl-option>`).join('');
 $('mapSel').addEventListener('sl-change', () => E.setMap($('mapSel').value));
+/* 悬浮窗没有顶栏，换地图只能靠底栏这个下拉。两个下拉共用同一份地图表，
+   值由 render() 统一同步，所以从哪边改都一致。 */
+$('hudMapSel').innerHTML = Object.values(MAPS).map(m =>
+  `<sl-option value="${m.id}">${m.name}</sl-option>`).join('');
+$('hudMapSel').addEventListener('sl-change', () => E.setMap($('hudMapSel').value));
 $('srcSel').addEventListener('sl-change', () => E.setSrcMode($('srcSel').value));
+/* 桌面版的瓦片由本地代理统管（磁盘缓存 + 在线兜底），没有「来源」可选 */
+if (IS_TAURI) $('srcSel').style.display = 'none';
 $('btnGrid').addEventListener('click', () => E.toggle('showGrid'));
 $('btnPoi').addEventListener('click',  () => E.toggle('showPoi'));
 $('btnMarks').addEventListener('click',() => E.toggle('showMarks'));
@@ -102,10 +166,23 @@ const MODE_HINT = {
   settings:'外观 / 数据备份 / 战斗记录',
 };
 
-/* ---------- 渲染调度 ---------- */
-let typing = false;
-$('panel').addEventListener('focusin', () => { typing = true; });
-$('panel').addEventListener('focusout', () => { typing = false; scheduleRender(); });
+/* ---------- 渲染调度 ----------
+ * 「面板里正在打字」才跳过重建（否则光标会跳）。这里【不能】存一个 focusin 布尔量：
+ * 点 <button> 时浏览器同样会先把焦点给按钮，focusin 一样冒泡到 #panel，
+ * 于是紧接着的 renderPanel() 直接 return，界面停在旧状态上，
+ * 要等焦点离开面板才刷新。用户报的「切自行火炮/迫击炮要过一会儿才切过去」
+ * 就是这个——状态早就切好了，只是面板不肯重画。
+ * 改成渲染时现查 document.activeElement，也就没有「标志位忘了复位」的余地。 */
+const TYPING_SEL = 'input, textarea, [contenteditable], sl-input, sl-textarea';
+function panelTyping(){
+  const a = document.activeElement;
+  return !!a && $('panel').contains(a) && !!a.closest(TYPING_SEL);
+}
+/* 焦点离开面板才需要补一次渲染；面板内部转移（输入框→另一个输入框）不必，
+   否则会和重建过程里「被销毁的元素触发 focusout」凑成一个来回重建的死循环。 */
+$('panel').addEventListener('focusout', e => {
+  if (!e.relatedTarget || !$('panel').contains(e.relatedTarget)) scheduleRender();
+});
 let raf = 0;
 function scheduleRender(){
   if (raf) return;
@@ -117,6 +194,7 @@ function render(){
   document.body.classList.toggle('light', S.theme !== 'dark');
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('on', b.dataset.mode === S.mode));
   if ($('mapSel').value !== S.mapId) $('mapSel').value = S.mapId;
+  if ($('hudMapSel').value !== S.mapId) $('hudMapSel').value = S.mapId;
   if ($('srcSel').value !== S.srcMode) $('srcSel').value = S.srcMode;
   $('btnGrid').classList.toggle('on', S.showGrid);
   $('btnPoi').classList.toggle('on', S.showPoi);
@@ -127,16 +205,25 @@ function render(){
   if (isOverlay){ renderHud(); return; }
   renderPanel();
 }
+let lastPanelKey = '';
 function renderPanel(){
-  if (typing) return;                       // 输入中不重建面板，避免光标跳动
-  const panel = $('panel');
-  const keep = panel.scrollTop;
+  if (panelTyping()) return;                // 输入中不重建面板，避免光标跳动
   const S = E.S;
-  panel.innerHTML = ({
+  const html = ({
     solve: viewSolve, predict: viewPredict, correct: viewCorrect,
     tools: viewTools, intel: viewIntel, build: viewBuild,
     table: viewTable, settings: viewSettings,
   })[S.mode]();
+  /* 内容没变就别碰 DOM。render() 被调用的次数远多于面板真正变化的次数，
+     而每次重建都要销毁再创建几十个 Shoelace 自定义元素、整块重排重绘。
+     对比字符串的开销是微秒级，换掉的是实打实的 DOM 抖动。
+     顺带也断掉了「重建 → 被销毁的元素触发 focusout → 又调度重建」的回环。 */
+  const key = S.mode + ' ' + html;
+  if (key === lastPanelKey) return;
+  lastPanelKey = key;
+  const panel = $('panel');
+  const keep = panel.scrollTop;
+  panel.innerHTML = html;
   panel.scrollTop = keep;
   bindPanel();
 }
@@ -179,11 +266,31 @@ function viewSolve(){
   </div>
   <div id="outSolve">${r ? solveResult(r) : ''}</div>`;
 }
+/* 武器 + 弹道弧选择条。只有一把武器 / 一条弹道时不渲染，避免出现点了没用的按钮。 */
+function weaponBar(){
+  const w = CW(), arc = CA();
+  if (WEAPONS.length < 2 && w.arcs.length < 2) return '';
+  return `
+    ${WEAPONS.length > 1 ? `<div class="seg" style="margin:0 0 9px">${WEAPONS.map(x =>
+      `<button data-wpn="${x.id}" class="${x.id===w.id?'on':''}" type="button">${esc(x.name)}</button>`).join('')}</div>` : ''}
+    ${w.arcs.length > 1 ? `<div class="seg" style="margin:0 0 9px">${w.arcs.map(a =>
+      `<button data-arc="${a.key}" class="${a.key===arc.key?'on':''}" type="button">${esc(a.label)}</button>`).join('')}</div>` : ''}`;
+}
 function solveResult(r){
   if (r.err) return alert('warn', esc(r.err));
+  /* 双解时两条弹道并排给出，点一下就切到那条（口令、复制、修偏差都跟着走） */
+  const dual = r.arcs && r.arcs.length > 1
+    ? `<div class="readout" style="margin-bottom:10px">${r.arcs.map(a => `
+        <div class="ro ${a.selected?'big':''}" data-arc-pick="${a.key}" style="cursor:pointer">
+          <div class="k">${esc(a.label)}${a.selected?' · 已选':''}</div>
+          <div class="v">${fm0(a.milR)}<small>密位</small></div>
+        </div>`).join('')}</div>`
+    : '';
   return `
   <div class="card">
-    <h3>射击诸元</h3>
+    <h3>射击诸元 · ${esc(r.weaponName)}</h3>
+    ${weaponBar()}
+    ${dual}
     <div class="readout">
       <div class="ro big"><div class="k">密位 MIL（右边仰角）</div><div class="v">${fm0(r.milR)}<small>密位</small></div></div>
       <div class="ro"><div class="k">RNG 距离（左边滑杆）</div><div class="v">${fm0(r.dist)}<small>m</small></div></div>
@@ -193,7 +300,7 @@ function solveResult(r){
       <span class="sp" style="flex:1"></span>
       <sl-button size="small" data-copy="${esc(r.cmd)}">复制</sl-button></div>
     ${alert(r.stCls, esc(r.stTxt))}
-    ${r.nf ? alert('bad', `🚫 目标位于禁炸区「${esc(r.nf)}」内——确认真的要打这里吗？`) : ''}
+    ${r.nf ? alert('bad', `${icon('ban')} 目标位于禁炸区「${esc(r.nf)}」内——确认真的要打这里吗？`) : ''}
     <div class="kv">
       <div><span>ΔX / ΔY（坐标单位）</span><span>${r.dx.toFixed(2)} / ${r.dy.toFixed(2)}</span></div>
       <div><span>50 MOA 散布</span><span>± ${r.spread.toFixed(1)} m</span></div>
@@ -224,14 +331,16 @@ function predictResult(r){
   if (r.err) return alert('warn', esc(r.err));
   return `
   <div class="card">
-    <h3>预测落点</h3>
+    <h3>预测落点 · ${esc(r.weaponName)}</h3>
+    ${weaponBar()}
+    <p class="muted" style="margin:0 0 9px">按 <b>${esc(r.arcLabel)}</b> 反查/正查射表。换弹道会得到完全不同的落点，别混用。</p>
     <div class="readout">
       <div class="ro big"><div class="k">预测落点 X / Y</div><div class="v">${fx(r.x)}<small>,</small> ${fx(r.y)}</div></div>
       <div class="ro"><div class="k">射程</div><div class="v">${fm0(r.dist)}<small>m</small></div></div>
       <div class="ro"><div class="k">对应密位</div><div class="v">${fm0(r.milBack)}</div></div>
     </div>
     ${alert(r.stCls, esc(r.stTxt) + (r.off ? '（原始落点超出地图边界，已截断）' : ''))}
-    ${r.nf ? alert('bad', `🚫 预测落点位于禁炸区「${esc(r.nf)}」内！先撤销禁炸区或换落点。`) : ''}
+    ${r.nf ? alert('bad', `${icon('ban')} 预测落点位于禁炸区「${esc(r.nf)}」内！先撤销禁炸区或换落点。`) : ''}
     <div class="kv">
       <div><span>方位角</span><span>${faz(r.azIn)}</span></div>
       <div><span>相对炮位偏移</span><span>ΔX ${r.dx.toFixed(2)} / ΔY ${r.dy.toFixed(2)}</span></div>
@@ -279,7 +388,7 @@ function correctResult(r){
     <div class="cmd"><span class="lb">修正口令</span><b>${esc(r.cmd)}</b>
       <span class="sp" style="flex:1"></span>
       <sl-button size="small" data-copy="${esc(r.cmd)}">复制</sl-button></div>
-    ${alert('ok', `${drTxt}；${daTxt}。L81 上<b>密位调小 = 打得更远</b>。`)}
+    ${alert('ok', `${drTxt}；${daTxt}。${esc(CW().name)}/${esc(CA().label)} 上 ${milHint()}。`)}
     <div class="kv">
       <div><span>目标距离 / 方位</span><span>${Math.round(r.tgtDist)} m / ${faz(r.tgtAz)}</span></div>
       <div><span>弹坑距离 / 方位</span><span>${Math.round(r.impDist)} m / ${faz(r.impAz)}</span></div>
@@ -292,16 +401,16 @@ function correctResult(r){
 function viewTools(){
   const S = E.S;
   const tools = [
-    ['ruler','📏 测距'], ['circle','⭕ 半径圈'], ['ray','🧭 方位线'],
-    ['marker','📍 标记'], ['route','🚶 路线'], ['poly','⬟ 区域'],
+    ['ruler','ruler','测距'], ['circle','circle-dashed','半径圈'], ['ray','compass','方位线'],
+    ['marker','map-pin','标记'], ['route','route','路线'], ['poly','hexagon','区域'],
   ];
   const body = {
     ruler: toolRuler, circle: toolCircle, ray: toolRay,
     marker: toolMarker, route: toolRoute, poly: toolPoly,
   }[S.tool]();
   return `
-  <div class="toolgrid">${tools.map(([id, lb]) =>
-    `<button data-tool="${id}" class="${S.tool === id ? 'on' : ''}" type="button">${lb}</button>`).join('')}</div>
+  <div class="toolgrid">${tools.map(([id, ic, lb]) =>
+    `<button data-tool="${id}" class="${S.tool === id ? 'on' : ''}" type="button">${icon(ic)}${lb}</button>`).join('')}</div>
   ${body}`;
 }
 function toolRuler(){
@@ -325,7 +434,7 @@ function toolCircle(){
       ${RADIUS_PRESETS.map(r => `<sl-button size="small" data-pr="${r}">${r} m</sl-button>`).join('')}
     </div>
     <div class="list">${S.circles.map(c => `
-      <div class="li"><span class="nm" style="color:#b57bd6">${esc(c.name)}</span>
+      <div class="li"><span class="nm" style="color:var(--mk-4)">${esc(c.name)}</span>
         <span class="co">${fx(c.x)}, ${fx(c.y)} · ${Math.round(c.r)} m</span><span class="sp"></span>
         <sl-button size="small" data-crd="${esc(c.name)}" data-d="-50">−50</sl-button>
         <sl-button size="small" data-crd="${esc(c.name)}" data-d="50">＋50</sl-button>
@@ -338,7 +447,7 @@ function toolRay(){
   return `<div class="card"><h3>方位线</h3>
     ${alert('warn','点第一下 = 起点，第二下 = 方向。用于报点：「敌人在这条线上」。')}
     <div class="list">${S.rays.map(ry => `
-      <div class="li"><span class="nm" style="color:#4fc2c2">${esc(ry.name)}</span>
+      <div class="li"><span class="nm" style="color:var(--mk-5)">${esc(ry.name)}</span>
         <span class="co">${fx(ry.x)}, ${fx(ry.y)} · ${ry.az.toFixed(0)}°</span><span class="sp"></span>
         <sl-button size="small" data-rdel="${esc(ry.name)}">删</sl-button></div>`).join('')
       || '<div class="li"><span class="co">还没有方位线</span></div>'}</div>
@@ -383,7 +492,7 @@ function toolPoly(){
       <sl-button size="small" id="pyClose" ${draftN>=3 ? '' : 'disabled'}>闭合区域</sl-button>
       <sl-button size="small" id="pyCancel">放弃</sl-button></div>` : ''}
     <div class="list">${S.polys.map(pg => `
-      <div class="li"><span class="nm">${pg.nofire ? '🚫 ' : ''}${esc(pg.name)}</span>
+      <div class="li"><span class="nm">${pg.nofire ? icon('ban') + ' ' : ''}${esc(pg.name)}</span>
         <span class="co">${pg.pts.length} 个顶点</span><span class="sp"></span>
         <sl-button size="small" data-pnf="${pg.id}">${pg.nofire?'改为普通区':'改为禁炸区'}</sl-button>
         <sl-button size="small" data-pdel="${pg.id}">删</sl-button></div>`).join('')
@@ -402,14 +511,14 @@ function viewIntel(){
     for (const mk of S.marks) cands.push({ name:mk.name, co:mk, color:mk.color });
     for (const t of towers) cands.push({ name:t.label, co:t });
     for (const sp of spawns) cands.push({ name:sp.label + '（出生点）', co:sp });
-    const mid = (MIN_R + MAX_R) / 2;
-    cands.forEach(c => { c.d = distM(c.co, S.target); c.ok = c.d >= MIN_R && c.d <= MAX_R; });
+    const w = CW(), mid = (w.minR + w.maxR) / 2;
+    cands.forEach(c => { c.d = distM(c.co, S.target); c.ok = c.d >= w.minR && c.d <= w.maxR; });
     cands.sort((a, b) => (b.ok - a.ok) || (Math.abs(a.d - mid) - Math.abs(b.d - mid)));
     candsHtml = cands.map(c => `
-      <div class="li"><span class="nm" ${c.color ? `style="color:${c.color}"` : ''}>${esc(c.name)}</span>
+      <div class="li"><span class="nm" ${c.color ? `style="color:${markCss(c.color)}"` : ''}>${esc(c.name)}</span>
         <span class="co">→ ${fm0(c.d)} m</span><span class="sp"></span>
-        ${c.ok ? `<sl-badge variant="success">可架设 · 密位 ${fm0(rangeToMil(c.d))}</sl-badge>`
-               : `<sl-badge variant="${c.d < MIN_R ? 'warning' : 'danger'}">${c.d < MIN_R ? '太近' : '超程'}</sl-badge>`}
+        ${c.ok ? `<sl-badge variant="success">可架设 · 密位 ${fm0(milAt(c.d, w))}${nSol(c.d, w) > 1 ? ' · 双解' : ''}</sl-badge>`
+               : `<sl-badge variant="${c.d < w.minR ? 'warning' : 'danger'}">${c.d < w.minR ? '太近' : '超程'}</sl-badge>`}
         <sl-button size="small" data-cd-x="${c.co.x}" data-cd-y="${c.co.y}">设炮位</sl-button></div>`).join('');
   }
   let mtxHtml = '<div class="li"><span class="co">这张图缺出生点或塔楼数据</span></div>';
@@ -430,23 +539,24 @@ function viewIntel(){
   for (const mk of S.marks) rngList.push({ name:mk.name, co:mk, kind:'mark', color:mk.color });
   let rangeHtml = '<div class="li"><span class="co">先放一个炮位</span></div>';
   if (S.mortar){
-    rngList.forEach(it => { it.d = distM(S.mortar, it.co); it.mil = Math.round(rangeToMil(it.d)); });
+    const w = CW();
+    rngList.forEach(it => { it.d = distM(S.mortar, it.co); it.mil = milAt(it.d, w); });
     rngList.sort((a, b) => a.d - b.d);
     rangeHtml = rngList.map(it => {
-      const ok = it.d >= MIN_R && it.d <= MAX_R;
-      return `<div class="li"><span class="nm" ${it.color ? `style="color:${it.color}"` : ''}>${esc(it.name)}</span>
+      const ok = it.d >= w.minR && it.d <= w.maxR;
+      return `<div class="li"><span class="nm" ${it.color ? `style="color:${markCss(it.color)}"` : ''}>${esc(it.name)}</span>
         <span class="co">${fm0(it.d)} m</span><span class="sp"></span>
-        ${ok ? `<sl-badge variant="success">密位 ${fm0(it.mil)}</sl-badge>` : `<sl-badge variant="neutral">${it.d < MIN_R ? '太近' : '超程'}</sl-badge>`}</div>`;
+        ${ok ? `<sl-badge variant="success">密位 ${fm0(it.mil)}${nSol(it.d, w) > 1 ? ' · 双解' : ''}</sl-badge>` : `<sl-badge variant="neutral">${it.d < w.minR ? '太近' : '超程'}</sl-badge>`}</div>`;
     }).join('');
   }
   const poiList = poisOf(m, poiFilter).map(p => `
-    <div class="li"><span class="nm" style="color:${p.icon==='tower' ? '#e05d5d' : 'inherit'}">${esc(p.label)}</span>
+    <div class="li"><span class="nm" style="color:${p.icon==='tower' ? 'var(--bad)' : 'inherit'}">${esc(p.label)}</span>
       <span class="co">${fx(p.x)}, ${fx(p.y)}</span><span class="sp"></span>
       <sl-button size="small" data-loc-x="${p.x}" data-loc-y="${p.y}">定位</sl-button>
       <sl-button size="small" data-tgt-x="${p.x}" data-tgt-y="${p.y}">设目标</sl-button></div>`).join('');
   return `
   <div class="card"><h3>炮位推荐 —— 谁能打到当前目标</h3>
-    <p class="muted" style="margin:0 0 8px">L81 有效射程 <b>132–684 m</b>，按接近中程排序。</p>
+    <p class="muted" style="margin:0 0 8px">${esc(CW().name)} 有效射程 <b>${CW().minR}–${CW().maxR} m</b>，按接近中程排序。</p>
     <div class="list" style="max-height:250px;overflow-y:auto">${candsHtml}</div></div>
   <div class="card"><h3>出生点决策 —— 到各塔楼距离</h3>
     <div class="tblwrap" style="max-height:220px">${mtxHtml}</div></div>
@@ -494,14 +604,14 @@ function viewBuild(){
       <sl-select id="buildSel" size="small" hoist style="flex:1">
         ${BUILD_CATALOG.map(e => `<sl-option value="${e.k}">${e.n}（${e.s} 建材${e.tier !== '—' ? ' · ' + e.tier + ' 锤' : ''}）</sl-option>`).join('')}
       </sl-select>
-      <sl-button variant="primary" id="btnBuildArm">${S.buildArm ? '点地图放置…' : '⬇ 放到地图上'}</sl-button>
+      <sl-button variant="primary" id="btnBuildArm">${S.buildArm ? '点地图放置…' : icon('arrow-down-to-line') + '放到地图上'}</sl-button>
     </div>
     <p class="muted" style="margin:8px 0 0">FOB 半径 60 m（蓝色圈）。需要 FOB 的建筑放在圈外会标红。</p>
     <div class="list" style="max-height:200px;overflow-y:auto">${S.builds.map(b => {
       const e = E.buildEntry(b.k);
       const bad = b.k !== 'fob' && !e.cat.includes('免') && E.nearestFobDist(b) > FOB_RADIUS;
-      return `<div class="li"><span class="nm" style="color:${b.k==='fob' ? '#5b9dd9' : bad ? '#e05d5d' : '#4caf7d'}">${esc(b.name)}</span>
-        <span class="co">${fx(b.x)}, ${fx(b.y)}${bad ? ' · ⚠圈外' : ''}</span><span class="sp"></span>
+      return `<div class="li"><span class="nm" style="color:${b.k==='fob' ? 'var(--mk-2)' : bad ? 'var(--bad)' : 'var(--ok-text)'}">${esc(b.name)}</span>
+        <span class="co">${fx(b.x)}, ${fx(b.y)}${bad ? ' · ' + icon('triangle-alert') + '圈外' : ''}</span><span class="sp"></span>
         <sl-button size="small" data-bloc="${b.id}">定位</sl-button>
         <sl-button size="small" data-bdel="${b.id}">删</sl-button></div>`;
     }).join('') || '<div class="li"><span class="co">还没有规划点</span></div>'}</div>
@@ -511,16 +621,31 @@ function viewBuild(){
 /* ---------- 视图：射表 ---------- */
 let tblQ = '';
 function viewTable(){
+  const w = CW(), arc = CA(), TBL = arc.tbl;
   const q = parseNum(tblQ);
   let bestI = -1, bestErr = 1e9;
   if (q != null) TBL.forEach(([r, mil], i) => {
     const e = Math.min(Math.abs(r - q), Math.abs(mil - q));
     if (e < bestErr){ bestErr = e; bestI = i; }
   });
+  const wSel = WEAPONS.length > 1
+    ? `<div class="seg" style="margin:0 0 9px">${WEAPONS.map(x =>
+        `<button data-wpn="${x.id}" class="${x.id===w.id?'on':''}" type="button">${esc(x.name)}</button>`).join('')}</div>`
+    : '';
+  // 只有一条弹道的武器（迫击炮）不显示弹道切换，免得点了个没用的按钮
+  const aSel = w.arcs.length > 1
+    ? `<div class="seg" style="margin:0 0 9px">${w.arcs.map(a =>
+        `<button data-arc="${a.key}" class="${a.key===arc.key?'on':''}" type="button">${esc(a.label)}</button>`).join('')}</div>`
+    : '';
+  const dual = w.arcs.length > 1
+    ? `<p class="muted" style="margin:0 0 9px">${esc(w.name)} 有低/高两条弹道：<b>${w.arcs[0].tbl[0][0]} m 以上两条都有解</b>，`
+      + `${w.arcs[0].tbl[0][0]} m 以下只能打高弹道。低弹道更平、飞行时间短、受风偏小，优先用。</p>`
+    : '';
   return `
-  <div class="card"><h3>L81 完整射表（社区测量 · 84 档）</h3>
+  <div class="card"><h3>${esc(w.name)} 完整射表（社区测量 · ${TBL.length} 档）</h3>
+    ${wSel}${aSel}${dual}
     <sl-input id="tblQ" size="small" placeholder="输入距离(m)或密位反查，如 300 或 690" value="${esc(tblQ)}" class="paste" style="margin:0 0 10px"></sl-input>
-    <div class="tblwrap" style="max-height:calc(100vh - 230px)"><table class="tbl"><thead><tr>
+    <div class="tblwrap" style="max-height:calc(100vh - 300px)"><table class="tbl"><thead><tr>
       <th>距离 m</th><th>密位 MIL</th><th>档间变化</th></tr></thead><tbody>
       ${TBL.map(([r, mil], i) => `<tr class="${i===bestI?'cur':''}">
         <td>${r}</td><td>${mil}</td>
@@ -539,6 +664,7 @@ function viewSettings(){
       <sl-switch id="swMarks" ${S.showMarks ? 'checked' : ''}>自定义标记</sl-switch>
     </div>
   </div>
+  ${mapDataCard()}
   <div class="card"><h3>数据备份</h3>
     <p class="muted" style="margin:0 0 9px">标记、圈、线、路线、区域、建造规划都保存在本机。换电脑或清缓存前先导出。</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:9px">
@@ -593,7 +719,7 @@ function bindPanel(){
     E.compute();
     if (S.mortar && S.target){
       const {dist, az} = solveVector(S.target.x-S.mortar.x, S.target.y-S.mortar.y);
-      E.logShot(`算诸元 → 方位 ${faz(az)} 距离 ${fm0(dist)} 密位 ${fm0(rangeToMil(dist))}`);
+      E.logShot(`算诸元[${CW().name}/${CA().label}] → 方位 ${faz(az)} 距离 ${fm0(dist)} 密位 ${fm0(milAt(dist))}`);
     }
     E.draw(); E.save(); scheduleRender();
   });
@@ -607,9 +733,13 @@ function bindPanel(){
   if (btnCorrect) btnCorrect.addEventListener('click', () => {
     E.compute();
     if (S.mortar && S.impact && S.target)
-      E.logShot(`修偏差 → 密位 ${fm0(rangeToMil(solveVector(S.target.x-S.mortar.x, S.target.y-S.mortar.y).dist))}`);
+      E.logShot(`修偏差[${CW().name}/${CA().label}] → 密位 ${fm0(milAt(solveVector(S.target.x-S.mortar.x, S.target.y-S.mortar.y).dist))}`);
     E.draw(); E.save(); scheduleRender();
   });
+  /* 武器 / 弹道弧切换 */
+  panel.querySelectorAll('[data-wpn]').forEach(b => b.addEventListener('click', () => E.setWeapon(b.dataset.wpn)));
+  panel.querySelectorAll('[data-arc]').forEach(b => b.addEventListener('click', () => E.setArc(b.dataset.arc)));
+  panel.querySelectorAll('[data-arc-pick]').forEach(b => b.addEventListener('click', () => E.setArc(b.dataset.arcPick)));
   /* 工具 */
   panel.querySelectorAll('.toolgrid [data-tool]').forEach(b => b.addEventListener('click', () => {
     S.tool = b.dataset.tool; S.pend = null; E.draw(); E.save(); scheduleRender();
@@ -716,6 +846,8 @@ function bindPanel(){
   });
   const swMarks = $('swMarks');
   if (swMarks) swMarks.addEventListener('click', () => { S.showMarks = !S.showMarks; E.save(); scheduleRender(); });
+  /* 地图数据卡片：只有在桌面版才存在（网页版 mapDataCard() 返回空串） */
+  bindMapData(panel, scheduleRender);
   const btnExport = $('btnExport');
   if (btnExport) btnExport.addEventListener('click', () => {
     $('ioBox').value = E.exportJSON(); toast('已生成，可全选复制保存');
@@ -744,7 +876,8 @@ function renderHud(){
   $('hudDist').textContent = ok ? fm0(r.dist) + 'm' : '—';
   $('hudMil').textContent = ok ? fm0(r.milR) : '—';
   $('hudMil').style.color = bad ? 'var(--bad)' : '';
-  $('hudDist').textContent = ok ? (fm0(r.dist) + 'm' + (bad ? ' 🚫' : '')) : '—';
+  // 用 innerHTML 而非 textContent：要在距离后追加禁炸区图标
+  $('hudDist').innerHTML = ok ? (fm0(r.dist) + 'm' + (bad ? ' ' + icon('ban', 'bad') : '')) : '—';
   $('hudPut').textContent = S.put === 'target' ? '放目标' : '放炮位';
 }
 if (isOverlay){
@@ -757,6 +890,19 @@ if (isOverlay){
   });
 }
 
+/* ---------- 桌面版：地图数据卡片的数据源 ----------
+   只在「数据」页可见，所以懒加载即可；但下载进度是主动推来的，
+   得一直听着——用户切走了页面，回来时应该看到最新进度而不是旧数字。 */
+if (IS_TAURI){
+  probe();
+  refreshMapData().then(() => { if (E.S.mode === 'settings') scheduleRender(); });
+  onProgress(() => { if (E.S.mode === 'settings') scheduleRender(); });
+}
+
 /* ---------- 启动 ---------- */
 window.__E = E;   // 调试 / 无头测试钩子
 render();
+/* 首帧地图。网页版在脚本末尾显式调了 draw()+run()，桌面版这里一直漏着，
+   而引擎自己也只在 window resize 时才画——窗口尺寸不变就永远不画。
+   结果就是启动后地图区一片空白，要手动拖一下窗口才出图。 */
+E.draw();

@@ -4,41 +4,29 @@
  * 与 DOM 解耦：结果产出结构化对象，视图层负责渲染。
  * ============================================================ */
 import MAPS from './mapdata.js';
+import { icon, iconImage } from './icons.js';
+import { WEAPONS, DEFAULT_WEAPON, weaponById, arcsFor, rangeToMil, milToRange } from './weapons.js';
+import { IS_TAURI, TILE_HOST } from './desktop.js';
 
-/* ---------- 射表与数学 ---------- */
-export const TBL = [
-  [80,950],[87,940],[93,930],[99,920],[105,910],[110,900],[115,890],[118,880],[122,870],[127,860],
-  [132,850],[140,840],[151,830],[163,820],[175,810],[187,800],[198,790],[208,780],[219,770],[229,760],
-  [239,750],[250,740],[260,730],[270,720],[280,710],[290,700],[300,690],[310,680],[319,670],[329,660],
-  [339,650],[348,640],[358,630],[367,620],[376,610],[385,600],[394,590],[403,580],[412,570],[420,560],
-  [429,550],[437,540],[446,530],[454,520],[462,510],[470,500],[478,490],[486,480],[494,470],[501,460],
-  [509,450],[516,440],[524,430],[531,420],[538,410],[545,400],[552,390],[559,380],[565,370],[572,360],
-  [578,350],[585,340],[591,330],[597,320],[603,310],[609,300],[615,290],[620,280],[626,270],[631,260],
-  [636,250],[641,240],[646,230],[651,220],[656,210],[661,200],[666,190],[670,180],[675,170],[680,160],
-  [684,150],[688,140],[693,130],[697,120]
-];
-export const MIN_R = 132, MAX_R = 684;
+/* ---------- 射表与数学 ----------
+ * 射表数据在 weapons.js（由 scripts/make_weapons.js 从社区测量数据生成），
+ * 网页版 mortar-map.html 内联的是同一份，改数据只改生成器，不要手改两边。
+ */
+export { WEAPONS, DEFAULT_WEAPON, weaponById, arcsFor, rangeToMil, milToRange };
 export const MOA50 = Math.tan(50/60 * Math.PI/180);
 
-export function rangeToMil(r){
-  const t = TBL;
-  if (r <= t[0][0]) return t[0][1];
-  if (r >= t[t.length-1][0]) return t[t.length-1][1];
-  for (let i=0;i<t.length-1;i++){
-    const [r1,m1]=t[i], [r2,m2]=t[i+1];
-    if (r <= r2) return m1 + (r-r1)*(m2-m1)/(r2-r1);
-  }
-  return t[t.length-1][1];
-}
-export function milToRange(m){
-  const t = TBL;
-  if (m >= t[0][1]) return t[0][0];
-  if (m <= t[t.length-1][1]) return t[t.length-1][0];
-  for (let i=0;i<t.length-1;i++){
-    const [r1,m1]=t[i], [r2,m2]=t[i+1];
-    if (m >= m2) return r1 + (m-m1)*(r2-r1)/(m2-m1);
-  }
-  return t[t.length-1][0];
+/* 当前武器的默认弹道弧：优先低弹道（平射更准、飞行时间更短）。 */
+export function defaultArc(w){ return w.arcs[0]; }
+export function arcOf(w, key){ return w.arcs.find(a => a.key === key) || defaultArc(w); }
+
+/* 一个距离上所有可用的弹道弧及各自的密位。
+   自行火炮在 780–1181 m 只有高弹道，1181 m 以上低/高两条都有——
+   所以结果是个数组，不是单个密位值。 */
+export function arcSolutions(w, dist){
+  return arcsFor(w, dist).map(a => ({
+    key: a.key, label: a.label, tbl: a.tbl,
+    mil: rangeToMil(dist, a.tbl),
+  }));
 }
 export function solveVector(dx, dy){
   const dist = 100 * Math.hypot(dx, dy);
@@ -113,7 +101,15 @@ export const BUILD_PRESETS = {
 };
 export const FOB_RADIUS = 60;
 export const UNIT_PRICE = 10, PALLET = 1800, UNIT_KG = 0.02;
+/* 标记调色板。这组色值是为【浅底】挑的深色，canvas 画在地图瓦片上（与页面主题无关），
+   但它们同时被拿去做列表项的文字色——深色主题下就成了深字压深底，基本读不出来。
+   DOM 里改走 --mk-1..6（随主题切到同色相的亮版本），canvas 仍用原色。
+   不在调色板内的自定义色原样返回，绝不吞掉用户自己的选择。 */
 export const MARK_COLORS = ['#a3322c','#2a5f9e','#a8621a','#7a3f9d','#1c7a7a','#c2185b'];
+export function markCss(hex){
+  const i = MARK_COLORS.indexOf(hex);
+  return i < 0 ? hex : `var(--mk-${i + 1})`;
+}
 export const RADIUS_PRESETS = [100,200,300,400,500,684];
 export { MAPS };
 
@@ -133,6 +129,7 @@ export function createEngine(canvas, opts = {}){
 
   const S = {
     mode:'solve', mapId:'bakurani',
+    weapon: DEFAULT_WEAPON, arc: null,   // arc=null → 用该武器的默认弹道弧
     mortar:null, target:null, impact:null, predPoint:null,
     put:'mortar', showGrid:true, showPoi:true,
     srcMode:'auto',
@@ -150,24 +147,43 @@ export function createEngine(canvas, opts = {}){
   const tileCache = new Map();
   const TILE_MAX = 700;
   let tileFail = 0, tileOk = 0;
+  let missing = 0;          // 本帧连祖先都顶不上的格子数，用于底图提示
   const probe = {};
   const MAP = () => MAPS[S.mapId];
   let drag = null, panning = null, moved = false;
+
+  /* canvas 画不了 <use>/currentColor，图标得烧成 data-URI 再 drawImage。
+     解码是异步的，首帧通常画不出；就绪后重绘一次即可。 */
+  function redrawIcon(){ draw(); }
+  const icoImg = (name, color, sw) => iconImage(name, color, sw, redrawIcon);
+
+  /* ---------- 当前武器 ---------- */
+  const W = () => weaponById(S.weapon);
+  /* 选中的弹道弧；S.arc 为 null 或在该武器上不存在时退回默认弧。 */
+  const ARC = () => arcOf(W(), S.arc);
+  /* 切换武器后，原来选的弧可能不存在了（低/高 → 单弹道），这里纠正一次。 */
+  function enforceArc(){ const w = W(); if (!w.arcs.some(a => a.key === S.arc)) S.arc = w.arcs[0].key; }
+  enforceArc();
 
   /* ---------- 底图来源 ---------- */
   const TILE_ROOT = 'tiles';
   function tileUrl(m, tz, tx, ty, local){
     const t = m.tiles;
-    return local
-      ? `${TILE_ROOT}/${m.id}/zoom_${tz}/${tx}_${ty}.${t.extension}`
-      : `${t.path}/zoom_${tz}/${tx}_${ty}.${t.extension}`;
+    if (!local) return `${t.path}/zoom_${tz}/${tx}_${ty}.${t.extension}`;
+    const rel = `${m.id}/zoom_${tz}/${tx}_${ty}.${t.extension}`;
+    /* 桌面版：交给 Rust 的 tile:// 代理。它内部已经是「磁盘缓存 → CDN」，
+       所以这里的 local 分支同时也就是在线分支，还有持久化缓存加持。 */
+    return IS_TAURI ? `${TILE_HOST}/${rel}` : `${TILE_ROOT}/${rel}`;
   }
   function tileBase(m){
+    /* 桌面版恒走代理：代理拿不到才会 404，那时 getTile 会退回直连 CDN */
+    if (IS_TAURI) return 'local';
     if (S.srcMode === 'local') return 'local';
     if (S.srcMode === 'cdn')   return 'cdn';
     return probe[m.id] || 'pending';
   }
   function probeLocal(m){
+    if (IS_TAURI) return;                 // 代理已定，不必探测
     if (S.srcMode !== 'auto'){ probe[m.id] = S.srcMode === 'local' ? 'local' : 'cdn'; return; }
     if (probe[m.id]) return;
     probe[m.id] = 'pending';
@@ -264,9 +280,12 @@ export function createEngine(canvas, opts = {}){
   }
   function drawNoTileBadge(){
     const p = probe[MAP().id];
+    /* 只要画出过瓦片（含祖先兜底顶上的）就不打扰用户：画面已经有图，
+       只是可能还不够清晰，这不是需要报警的状态。 */
     if (tileOk > 0) return;
     const txt = p === 'pending' ? '正在检测底图…'
-      : (S.srcMode === 'cdn' || p === 'cdn') && tileFail >= 3 ? '底图无法加载（离线？）· 网格与标点仍可用'
+      : (IS_TAURI || S.srcMode === 'cdn' || p === 'cdn') && tileFail >= 3
+        ? '底图无法加载（离线？）· 网格与标点仍可用'
       : tileFail >= 3 ? '底图缺失 · 网格与标点仍可用' : '底图加载中…';
     ctx.font = '600 12px system-ui';
     const w = ctx.measureText(txt).width + 20;
@@ -287,16 +306,52 @@ export function createEngine(canvas, opts = {}){
     const x0 = Math.max(0, Math.floor((0 - tl.x)/px)), x1 = Math.min(n-1, Math.floor((CW - tl.x)/px));
     const y0 = Math.max(0, Math.floor((0 - tl.y)/py)), y1 = Math.min(n-1, Math.floor((CH - tl.y)/py));
     ctx.imageSmoothingEnabled = true;
+    missing = 0;
     for (let ty=y0; ty<=y1; ty++){
       for (let tx=x0; tx<=x1; tx++){
-        const img = getTile(m, tz, tx, ty);
         const sx = tl.x + tx*px, sy = tl.y + ty*py;
+        const img = getTile(m, tz, tx, ty);
         if (img && img.complete && img.naturalWidth){
           ctx.drawImage(img, sx, sy, px+0.6, py+0.6);
+          continue;
         }
+        /* 目标层这一块还没到：向上找最近的已加载祖先层，裁出对应的一小块放大顶上。
+           地图因此永远不会空白，只会「先糊后清晰」——感知速度提升最大的一招。 */
+        if (!drawAncestor(m, tz, tx, ty, sx, sy, px, py)) missing++;
+      }
+    }
+    prefetch(m, tz, x0, y0, x1, y1, n);
+  }
+  /** 用祖先层顶替 (tx,ty)；成功返回 true */
+  function drawAncestor(m, tz, tx, ty, sx, sy, px, py){
+    const minZ = m.tiles.minZoom;
+    for (let k = 1; k <= 5; k++){
+      const az = tz - k;
+      if (az < minZ) return false;
+      const f = 1 << k;
+      const aimg = getTile(m, az, tx >> k, ty >> k);
+      if (!(aimg && aimg.complete && aimg.naturalWidth)) continue;
+      /* 祖先瓦片被 2^k × 2^k 等分，(tx,ty) 落在其中第 (tx%f, ty%f) 格 */
+      const sw = aimg.naturalWidth / f, sh = aimg.naturalHeight / f;
+      ctx.drawImage(aimg, (tx % f) * sw, (ty % f) * sh, sw, sh, sx, sy, px+0.6, py+0.6);
+      return true;
+    }
+    return false;
+  }
+  /* 视野外扩一圈预取：平移时下一屏已经在了，不会「推出了白边再等」 */
+  let prefetchOn = true;
+  function prefetch(m, tz, x0, y0, x1, y1, n){
+    if (!prefetchOn) return;
+    for (let ty=y0-1; ty<=y1+1; ty++){
+      if (ty < 0 || ty >= n) continue;
+      for (let tx=x0-1; tx<=x1+1; tx++){
+        if (tx < 0 || tx >= n) continue;
+        if (tx >= x0 && tx <= x1 && ty >= y0 && ty <= y1) continue;  // 可见区已请求过
+        getTile(m, tz, tx, ty);
       }
     }
   }
+  function setPrefetch(on){ prefetchOn = !!on; }
   function drawGrid(){
     const b = MAP().bounds;
     const w0 = s2w(0,0), w1 = s2w(CW,CH);
@@ -393,11 +448,14 @@ export function createEngine(canvas, opts = {}){
       drawPolyPath(pg.pts, true, pg.color, fill);
       const c = polyCentroid(pg.pts), s = w2s(c.x, c.y);
       ctx.font = '600 11px system-ui';
-      const txt = (pg.nofire ? '🚫' : '') + pg.name;
-      const tw = ctx.measureText(txt).width + 8;
+      const ico = pg.nofire ? icoImg('ban', pg.color, 2.4) : null;
+      const iw = ico ? 13 : 0;
+      const tw = ctx.measureText(pg.name).width + 8 + iw;
       ctx.fillStyle = 'rgba(255,255,255,.92)';
       ctx.fillRect(s.x-tw/2, s.y-9, tw, 17);
-      ctx.fillStyle = pg.color; ctx.fillText(txt, s.x-tw/2+4, s.y+4);
+      ctx.fillStyle = pg.color;
+      if (ico) ctx.drawImage(ico, s.x-tw/2+4, s.y-6, 11, 11);
+      ctx.fillText(pg.name, s.x-tw/2+4+iw, s.y+4);
     }
     if (S.mode === 'tools' && S.polyDraft && S.polyDraft.pts.length){
       drawPolyPath(S.polyDraft.pts, false, 'rgba(163,50,44,.8)');
@@ -509,16 +567,21 @@ export function createEngine(canvas, opts = {}){
       ctx.fillStyle = bad ? '#a3322c' : (b.k==='fob' ? '#2b7cc9' : '#2f6f4f'); ctx.fill();
       ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke();
       ctx.font = '600 10.5px system-ui';
-      const tw = ctx.measureText(b.name).width + 8;
+      const col = bad ? '#a3322c' : (b.k==='fob' ? '#2b7cc9' : '#1d4d35');
+      const ico = bad ? icoImg('triangle-alert', col, 2.4) : null;
+      const iw = ico ? 12 : 0;
+      const tw = ctx.measureText(b.name).width + 8 + iw;
       ctx.fillStyle = 'rgba(255,255,255,.94)'; ctx.fillRect(p.x+7, p.y-13, tw, 16);
-      ctx.fillStyle = bad ? '#a3322c' : (b.k==='fob' ? '#2b7cc9' : '#1d4d35');
-      ctx.fillText(b.name + (bad ? ' ⚠圈外' : ''), p.x+11, p.y-1);
+      ctx.fillStyle = col;
+      if (ico) ctx.drawImage(ico, p.x+11, p.y-8, 10, 10);
+      ctx.fillText(b.name, p.x+11+iw, p.y-1);
     }
   }
   function drawSolution(){
     if (S.mortar){
-      ring(S.mortar.x, S.mortar.y, MAX_R, 'rgba(47,111,79,.5)');
-      ring(S.mortar.x, S.mortar.y, MIN_R, 'rgba(163,50,44,.5)');
+      const w = W();
+      ring(S.mortar.x, S.mortar.y, w.maxR, 'rgba(47,111,79,.5)');
+      ring(S.mortar.x, S.mortar.y, w.minR, 'rgba(163,50,44,.5)');
     }
     const showT = S.mode==='solve' || S.mode==='correct';
     if (S.mode==='solve' && S.mortar && S.target){
@@ -551,18 +614,34 @@ export function createEngine(canvas, opts = {}){
       S.results.solve = { err: !mortar ? '先设一个炮位坐标，或点「放炮位」后在地图上点。' : '还差目标坐标——点「放目标」后在地图上点，或直接填坐标。' };
       return;
     }
+    const w = W();
     const {dist, az} = solveVector(target.x-mortar.x, target.y-mortar.y);
-    const mil = rangeToMil(dist), milR = Math.round(mil);
-    const distAtMil = milToRange(milR);
+    const sols = arcSolutions(w, dist);
+    const pick = sols.find(a => a.key === ARC().key) || sols[0] || null;
+    const mil = pick ? pick.mil : 0, milR = Math.round(mil);
+    const distAtMil = pick ? milToRange(milR, pick.tbl) : 0;
     const spread = dist * MOA50;
+    const nm = w.name;
     let stCls = 'ok', stTxt = '';
-    if (dist < MIN_R){ stCls='bad'; stTxt = `太近了——低于 L81 最小射程 ${MIN_R} m，这一发打不出去。把炮位往回挪。`; }
-    else if (dist > MAX_R){ stCls='bad'; stTxt = `太远了——超出 L81 最大射程 ${MAX_R} m 约 ${Math.round(dist-MAX_R)} m。往前推炮位。`; }
-    else if (dist > MAX_R-40){ stCls='warn'; stTxt = `贴近最大射程（${MAX_R} m），密位随距离变化极快，能挪近一点就挪近一点。`; }
-    else stTxt = `目标在有效射程内（${MIN_R}–${MAX_R} m）。表内插值密位 ${mil.toFixed(1)}，取整 ${milR} → 对应 ${Math.round(distAtMil)} m。`;
+    if (dist < w.minR){ stCls='bad'; stTxt = `太近了——低于 ${nm} 最小射程 ${w.minR} m，这一发打不出去。把炮位往回挪。`; }
+    else if (dist > w.maxR){ stCls='bad'; stTxt = `太远了——超出 ${nm} 最大射程 ${w.maxR} m 约 ${Math.round(dist-w.maxR)} m。往前推炮位。`; }
+    else if (dist > w.maxR-40){ stCls='warn'; stTxt = `贴近最大射程（${w.maxR} m），密位随距离变化极快，能挪近一点就挪近一点。`; }
+    else if (sols.length > 1){
+      const l = sols.map(a => `${a.label} ${Math.round(a.mil)}`).join(' / ');
+      stTxt = `目标在有效射程内（${w.minR}–${w.maxR} m），两条弹道都有解：${l} 密位。低弹道弹道更平、受风偏影响小，优先用。`;
+    }
+    else stTxt = `目标在有效射程内（${w.minR}–${w.maxR} m），只有${sols[0] ? sols[0].label : '默认弹道'}可用。表内插值密位 ${mil.toFixed(1)}，取整 ${milR} → 对应 ${Math.round(distAtMil)} m。`;
     S.lastAz = az;
     const nfT = nf(target);
     S.results.solve = { mil, milR, dist, az, distAtMil, spread, stCls, stTxt,
+      weapon: w.id, weaponName: nm,
+      /* 每条可用弹道的完整解，UI 逐条展示；选中的那条决定口令与复制内容 */
+      arc: pick ? pick.key : null,
+      arcs: sols.map(a => {
+        const r = Math.round(a.mil);
+        return { key:a.key, label:a.label, mil:a.mil, milR:r,
+                 distAtMil: milToRange(r, a.tbl), selected: !!pick && a.key === pick.key };
+      }),
       nf: nfT ? nfT.name : null, dx: target.x-mortar.x, dy: target.y-mortar.y,
       cmd: `方位 ${faz(az)}，距离 ${fm0(dist)}，密位 ${fm0(milR)}` };
   }
@@ -574,22 +653,36 @@ export function createEngine(canvas, opts = {}){
     if (!mortar){ S.predPoint = null; S.results.predict = { err:'先填炮位坐标，或在地图上点一下放炮位。' }; return; }
     if (azIn == null){ S.predPoint = null; S.results.predict = { err:'填一个方位角（0–360，0=北 90=东）。' }; return; }
     if (milIn == null && rngIn == null){ S.predPoint = null; S.results.predict = { err:'密位和 RNG 至少填一个。' }; return; }
+    const w = W(), arc = ARC();
+    const tableMax = arc.tbl[arc.tbl.length-1][0];
+    /* 表里密位是单调的，取首末即得量程 */
+    const m1 = arc.tbl[0][1], m2 = arc.tbl[arc.tbl.length-1][1];
+    const milLo = Math.min(m1, m2), milHi = Math.max(m1, m2);
+    /* 密位喂错弹道是很容易犯的错（低弹道 84 喂给高弹道量程 610–1400），
+       milToRange 会静默夹到端点，结果看起来正常但其实完全不对，所以这里显式拦一道。 */
+    const milOff = milIn != null && (milIn < milLo || milIn > milHi);
     let dist, srcTxt;
-    if (milIn != null){ dist = milToRange(milIn); srcTxt = `由密位 ${fm0(milIn)} 反查射表`; }
+    /* 反查射表必须用选中的那条弹道弧——低弹道 1500 m 是 84 密位，
+       高弹道同一距离是 1213 密位，用错表会算到完全不同的地方。 */
+    if (milIn != null){ dist = milToRange(milIn, arc.tbl); srcTxt = `由${arc.label}密位 ${fm0(milIn)} 反查射表`; }
     else { dist = rngIn; srcTxt = '由 RNG 距离直接给出'; }
     const pt = unitToXY(mortar.x, mortar.y, azIn, dist);
     const clX = Math.max(0, Math.min(163.84, pt.x)), clY = Math.max(0, Math.min(163.84, pt.y));
     const off = Math.abs(clX-pt.x) > 1e-9 || Math.abs(clY-pt.y) > 1e-9;
     const c = { x: Math.round(clX*100)/100, y: Math.round(clY*100)/100 };
     S.predPoint = c;
-    const milBack = rangeToMil(dist);
+    const milBack = rangeToMil(dist, arc.tbl);
     let stCls='ok', stTxt='';
-    if (dist < MIN_R){ stCls='bad'; stTxt = `射程 ${Math.round(dist)} m 低于最小射程 ${MIN_R} m，打不到。`; }
-    else if (dist > MAX_R + 13){ stCls='bad'; stTxt = `射程 ${Math.round(dist)} m 超出射表上限，炮弹会在更近处落地。`; }
-    else if (dist > MAX_R){ stCls='warn'; stTxt = `射程 ${Math.round(dist)} m 略超 ${MAX_R} m，已外推，实际会打短。`; }
+    if (milOff){ stCls='bad';
+      stTxt = `密位 ${fm0(milIn)} 不在${arc.label}的量程（${milLo}–${milHi}）内，已按表端取值，落点不可信。`
+            + `换一条弹道，或改用 RNG 距离。`; }
+    else if (dist < w.minR){ stCls='bad'; stTxt = `射程 ${Math.round(dist)} m 低于 ${w.name} 最小射程 ${w.minR} m，打不到。`; }
+    else if (dist > tableMax + 13){ stCls='bad'; stTxt = `射程 ${Math.round(dist)} m 超出射表上限，炮弹会在更近处落地。`; }
+    else if (dist > tableMax){ stCls='warn'; stTxt = `射程 ${Math.round(dist)} m 略超 ${arc.label}表上限 ${tableMax} m，已外推，实际会打短。`; }
     else stTxt = `落点如下，${srcTxt}。`;
     const nfP = nf(c);
     S.results.predict = { x:c.x, y:c.y, dist, milBack, stCls, stTxt, off,
+      weapon: w.id, weaponName: w.name, arc: arc.key, arcLabel: arc.label, milOff,
       azIn, dx:c.x-mortar.x, dy:c.y-mortar.y, spread:dist*MOA50, nf: nfP ? nfP.name : null };
   }
   function computeCorrect(){
@@ -597,18 +690,21 @@ export function createEngine(canvas, opts = {}){
     if (!mortar || !impact){
       S.results.correct = { err:'填上炮位和弹坑坐标（目标可以留空）。' }; return;
     }
+    const w = W(), arc = ARC();
     const imp = solveVector(impact.x-mortar.x, impact.y-mortar.y);
     if (!target){
       S.results.correct = { partial:true, impDist:imp.dist, impAz:imp.az,
-        mil:rangeToMil(imp.dist), spread:imp.dist*MOA50 };
+        weapon:w.id, weaponName:w.name, arc:arc.key, arcLabel:arc.label,
+        mil:rangeToMil(imp.dist, arc.tbl), spread:imp.dist*MOA50 };
       return;
     }
     const tgt = solveVector(target.x-mortar.x, target.y-mortar.y);
     let dAz = tgt.az - imp.az;
     while (dAz > 180) dAz -= 360; while (dAz < -180) dAz += 360;
     const dR = tgt.dist - imp.dist;
-    const newMil = Math.round(rangeToMil(tgt.dist));
+    const newMil = Math.round(rangeToMil(tgt.dist, arc.tbl));
     S.results.correct = { mil:newMil, az:tgt.az, dR, dAz,
+      weapon:w.id, weaponName:w.name, arc:arc.key, arcLabel:arc.label,
       tgtDist:tgt.dist, tgtAz:tgt.az, impDist:imp.dist, impAz:imp.az,
       dev: Math.round(Math.hypot(target.x-impact.x, target.y-impact.y)*100),
       cmd: `${Math.abs(dR)>=2 ? (dR>0?'加':'减')+Math.abs(Math.round(dR))+'米 · ' : ''}${Math.abs(dAz)>=0.5 ? (dAz>0?'右转':'左转')+' '+Math.abs(dAz).toFixed(1)+'° · ' : ''}方位 ${faz(tgt.az)}，距离 ${fm0(tgt.dist)}，密位 ${fm0(newMil)}` };
@@ -681,7 +777,7 @@ export function createEngine(canvas, opts = {}){
     S.builds.push({ id, k:e.k, x:c.x, y:c.y, name:e.n });
     if (!e.fob && e.k !== 'fob'){
       const d = nearestFobDist(c);
-      if (d > FOB_RADIUS) toast('⚠ 不在任何 FOB 半径内（最近 ' + Math.round(d) + ' m），游戏里放不下');
+      if (d > FOB_RADIUS) toast(icon('triangle-alert') + ' 不在任何 FOB 半径内（最近 ' + Math.round(d) + ' m），游戏里放不下');
     }
     S.buildArm = null;
     save(); emit();
@@ -742,8 +838,10 @@ export function createEngine(canvas, opts = {}){
       S.view.cy += (py - panning.py)/S.view.scale;
       panning = {px, py}; draw();
     }
-    onCursor(w);
+    onCursor(w, px, py);
   });
+  /* 指针离开地图：回调 null，前端据此收起坐标浮标 */
+  canvas.addEventListener('pointerleave', () => onCursor(null));
   ['pointerup','pointercancel'].forEach(ev => canvas.addEventListener(ev, () => { drag = null; panning = null; }));
   canvas.addEventListener('click', e => {
     resizeIfNeeded();
@@ -780,10 +878,24 @@ export function createEngine(canvas, opts = {}){
   canvas.addEventListener('contextmenu', e => e.preventDefault());
   window.addEventListener('resize', () => { lastW = 0; draw(); });
 
+  /* 画布自己盯尺寸。原先只有 window 的 resize 事件会触发重绘，而窗口尺寸没变时
+     这个事件根本不发——画布因为别的缘故（右边面板收起、布局变化）改了大小就没人管。
+     ResizeObserver 补上这一块，顺带在 observe() 时立刻回调一次兜底首帧；
+     真正的主路径是启动时显式那一发 draw()（见 app.js 末尾）——
+     以前两边都没有，桌面版开出来就是一张空地图，得手动拖一下窗口才出图。 */
+  if (typeof ResizeObserver !== 'undefined'){
+    new ResizeObserver(() => {
+      const r = canvas.getBoundingClientRect();
+      if (Math.round(r.width) === lastW && Math.round(r.height) === lastH) return;
+      draw();                       // 尺寸同步交给 draw() 里的 resizeIfNeeded()
+    }).observe(canvas);
+  }
+
   /* ---------- 存取 ---------- */
   function save(){
     try { localStorage.setItem(STORE_KEY, JSON.stringify({
       mortar:S.mortar, target:S.target, impact:S.impact, mode:S.mode, mapId:S.mapId,
+      weapon:S.weapon, arc:S.arc,
       predAz:S.predAz, predMil:S.predMil, predRng:S.predRng,
       tool:S.tool, ruler:S.ruler, circles:S.circles, rays:S.rays,
       marks:S.marks, showMarks:S.showMarks, theme:S.theme, hist:S.hist.slice(0,60), seq:S.seq,
@@ -805,6 +917,9 @@ export function createEngine(canvas, opts = {}){
       if (d.az != null) S.predAz = d.az;         // 兼容网页版旧档
       if (d.mil != null) S.predMil = d.mil;
       if (d.rng != null) S.predRng = d.rng;
+      if (d.weapon && WEAPONS.some(w => w.id === d.weapon)) S.weapon = d.weapon;
+      if (d.arc) S.arc = d.arc;
+      enforceArc();
       if (d.mapId && MAPS[d.mapId]) S.mapId = d.mapId;
       if (d.tool) S.tool = d.tool;
       if (d.ruler) S.ruler = d.ruler;
@@ -834,6 +949,19 @@ export function createEngine(canvas, opts = {}){
   return {
     S, MAP, MAPS, draw, fitMap, resize, run, compute, save,
     setMap(id){ S.mapId = id; tileFail = 0; tileOk = 0; fitMap(); draw(); save(); emit(); },
+    weapon(){ return W(); },
+    arc(){ return ARC(); },
+    setWeapon(id){
+      if (!WEAPONS.some(w => w.id === id)) return;
+      S.weapon = id; enforceArc();
+      run(false);
+    },
+    setArc(key){
+      const w = W();
+      if (!w.arcs.some(a => a.key === key)) return;
+      S.arc = key;
+      run(false);
+    },
     setSrcMode(m){
       S.srcMode = m;
       try { localStorage.setItem(SRC_KEY, m); } catch(e){}
@@ -841,9 +969,11 @@ export function createEngine(canvas, opts = {}){
       tileFail = 0; tileOk = 0; lastW = 0;
       draw(); emit();
     },
+    setPrefetch,
     tileStat(){
       const p = probe[MAP().id];
-      const name = p === 'local' ? '本地离线' : p === 'cdn' ? '在线 CDN' : p === 'pending' ? '检测中…' : '待检测';
+      const name = IS_TAURI ? '本地缓存 + 在线兜底'
+        : p === 'local' ? '本地离线' : p === 'cdn' ? '在线 CDN' : p === 'pending' ? '检测中…' : '待检测';
       return { name, tileOk, tileFail };
     },
     toggle(key){ S[key] = !S[key]; draw(); save(); emit(); },

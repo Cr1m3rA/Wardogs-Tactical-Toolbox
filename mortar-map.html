@@ -8,10 +8,19 @@
 <style>
   :root{
     --bg:#f4f5f7; --panel:#fff; --line:#e2e5ea; --line-strong:#c8cdd6;
-    --ink:#1c2024; --ink-2:#5a6169; --ink-3:#8b929b;
+    --ink:#1c2024; --ink-2:#5a6169; --ink-3:#818e9e;
     --accent:#2f6f4f; --accent-soft:#e7f1eb;
     --warn:#a8621a; --warn-soft:#fdf1e3;
     --bad:#a3322c; --bad-soft:#fbeceb;
+    /* 语义色的【文字】版本。--accent / --warn / --bad 这三个色本身是为浅底挑的深色，
+       深色主题下它们会连同 --*-soft 底一起变浅（见 body.dark），底色还是同一个色相，
+       于是深字压深底——按钮选中态、状态条、徽章全糊掉。文字一律走这组变量。 */
+    --accent-ink:#1d4d35; --warn-ink:#7c4712; --bad-ink:#8a2721;
+    --accent-btn:var(--accent);  /* 主按钮的填充色。白字压在上面，深色主题要压深一档 */
+    --accent-line:#cfe3d7;   /* 浅绿底上的描边，深色主题下要跟着变深 */
+    /* 标记调色板（engine.js MARK_COLORS 的同一组色相）：canvas 用具体色值画在地图上，
+       DOM 列表里的文字色走这几个变量，深色主题下换成同色相的亮版本。 */
+    --mk-1:#a3322c; --mk-2:#2a5f9e; --mk-3:#a8621a; --mk-4:#7a3f9d; --mk-5:#1c7a7a; --mk-6:#c2185b;
     --ro-bg:#fafbfc; --paste-bg:#fafbfc; --input-bg:#fff;
     --mono:ui-monospace,"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
   }
@@ -21,6 +30,10 @@
     --accent:#4e9b74; --accent-soft:#1d2f26;
     --warn:#c98a3d; --warn-soft:#2e2517;
     --bad:#c9564f; --bad-soft:#331d1c;
+    --accent-ink:#9ed4b6; --warn-ink:#f0c48a; --bad-ink:#f0a09a;
+    --accent-btn:#3f7f5f;        /* 白字压在亮绿 #4e9b74 上只有 3.35:1，压深后 4.76:1 */
+    --accent-line:#2f4a3b;
+    --mk-1:#e07070; --mk-2:#6ea3e0; --mk-3:#d9a24a; --mk-4:#b98ae0; --mk-5:#4fc2c2; --mk-6:#e0709e;
     --ro-bg:#20262d; --paste-bg:#20262d; --input-bg:#20262d;
   }
   *{box-sizing:border-box}
@@ -43,6 +56,14 @@
   .mapbox{position:relative;height:640px;background:#dfe3e8;border-radius:0 0 10px 10px;overflow:hidden}
   @media (max-width:980px){.mapbox{height:70vw;min-height:340px}}
   canvas#map{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}
+  /* 指针坐标浮标：跟着指针走，在指针附近实时显示所在坐标（1 格 = 100 m）。
+     底色与文字都取主题变量：写死深底 + var(--ink) 会在浅色主题下变成深字压深底。 */
+  .cursor-tip{position:absolute;z-index:7;pointer-events:none;
+    padding:2px 7px;border-radius:6px;background:var(--panel);
+    border:1px solid var(--line-strong);color:var(--ink);
+    font:500 11.5px/1.45 var(--mono);white-space:nowrap;
+    box-shadow:0 2px 10px rgba(0,0,0,.45);transform:translate(13px,13px)}
+  .cursor-tip[hidden]{display:none}
   .gr-hint{padding:8px 13px;border-top:1px solid var(--line);color:var(--ink-3);
     font-size:11.5px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
   .gr-tools{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
@@ -65,24 +86,24 @@
   button.btn{appearance:none;font:inherit;font-size:12.5px;padding:7px 11px;border-radius:7px;
     border:1px solid var(--line-strong);background:var(--panel);color:var(--ink-2);cursor:pointer}
   button.btn:hover{border-color:var(--ink-3);color:var(--ink)}
-  button.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+  button.btn.pri{background:var(--accent-btn);border-color:var(--accent-btn);color:#fff}
   button.btn.pri:hover{background:#275c42;color:#fff}
-  button.btn.on{background:var(--accent-soft);border-color:var(--accent);color:#1d4d35;font-weight:600}
+  button.btn.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
   .pick{display:flex;gap:4px;background:var(--bg);padding:3px;border-radius:8px}
   .pick button{appearance:none;border:0;background:transparent;font:inherit;font-size:12px;
     padding:5px 10px;border-radius:6px;cursor:pointer;color:var(--ink-2)}
-  .pick button.on{background:#fff;color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.07)}
+  .pick button.on{background:var(--panel);color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.07)}
   .readout{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:13px}
   .ro{background:var(--ro-bg);border:1px solid var(--line);border-radius:9px;padding:10px 11px}
   .ro .k{font-size:11px;color:var(--ink-3)}
   .ro .v{font:600 25px/1.15 var(--mono);margin-top:3px;letter-spacing:-.4px}
   .ro .v small{font-size:13px;font-weight:500;color:var(--ink-3);margin-left:3px}
-  .ro.big{grid-column:1/-1;background:var(--accent-soft);border-color:#cfe3d7}
-  .ro.big .v{color:#1d4d35;font-size:32px}
+  .ro.big{grid-column:1/-1;background:var(--accent-soft);border-color:var(--accent-line)}
+  .ro.big .v{color:var(--accent-ink);font-size:32px}
   .status{margin-top:11px;padding:9px 11px;border-radius:8px;font-size:12.5px;line-height:1.5}
-  .status.ok{background:var(--accent-soft);color:#1d4d35}
-  .status.warn{background:var(--warn-soft);color:#7c4712}
-  .status.bad{background:var(--bad-soft);color:#8a2721}
+  .status.ok{background:var(--accent-soft);color:var(--accent-ink)}
+  .status.warn{background:var(--warn-soft);color:var(--warn-ink)}
+  .status.bad{background:var(--bad-soft);color:var(--bad-ink)}
   .cmd{margin-top:13px;background:#22282c;color:#e9edf0;border-radius:9px;padding:11px 12px;
     font:13.5px/1.5 var(--mono);white-space:pre-wrap;word-break:break-word}
   .cmd .lb{display:block;font:600 10.5px/1 var(--mono);letter-spacing:1px;color:#8fa0a8;margin-bottom:7px}
@@ -96,7 +117,7 @@
   .notes b{color:var(--ink)}
   .notes ol{margin:8px 0 0;padding-left:20px}
   .notes li{margin:3px 0}
-  code{font:12.5px var(--mono);background:#eef0f3;padding:1.5px 5px;border-radius:4px}
+  code{font:12.5px var(--mono);background:var(--bg);color:var(--ink-2);padding:1.5px 5px;border-radius:4px}
   .foot{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);
     font-size:12px;color:var(--ink-3);line-height:1.6}
   .foot a{color:var(--accent)}
@@ -107,8 +128,7 @@
   .toolgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px}
   .toolgrid button{appearance:none;font:inherit;font-size:12px;padding:9px 4px;border-radius:8px;
     border:1px solid var(--line-strong);background:var(--ro-bg);color:var(--ink-2);cursor:pointer}
-  .toolgrid button.on{background:var(--accent-soft);border-color:var(--accent);color:#1d4d35;font-weight:600}
-  body.dark .toolgrid button.on{color:#9ed4b6}
+  .toolgrid button.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
   .list{margin-top:10px;border:1px solid var(--line);border-radius:8px;overflow:hidden;max-height:290px;overflow-y:auto}
   .list .li{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--line);
     font-size:12.5px;background:var(--panel)}
@@ -119,17 +139,14 @@
   .list .li .sp{flex:1}
   .list .li .btn{padding:4px 8px;font-size:11.5px}
   .badge{font:600 10.5px/1 var(--mono);padding:4px 6px;border-radius:5px;white-space:nowrap}
-  .badge.ok{background:var(--accent-soft);color:#1d4d35}
-  body.dark .badge.ok{color:#9ed4b6}
-  .badge.bad{background:var(--bad-soft);color:#8a2721}
-  body.dark .badge.bad{color:#e2938e}
+  .badge.ok{background:var(--accent-soft);color:var(--accent-ink)}
+  .badge.bad{background:var(--bad-soft);color:var(--bad-ink)}
   .tbl{width:100%;border-collapse:collapse;font:12.5px var(--mono)}
   .tbl th{font:600 11px system-ui;color:var(--ink-3);text-align:left;padding:6px 8px;
     border-bottom:1px solid var(--line-strong);position:sticky;top:0;background:var(--panel)}
   .tbl td{padding:5.5px 8px;border-bottom:1px solid var(--line);color:var(--ink-2)}
   .tbl td:first-child{color:var(--ink);font-weight:600}
-  .tbl tr.cur td{background:var(--accent-soft);color:#1d4d35;font-weight:600}
-  body.dark .tbl tr.cur td{color:#9ed4b6}
+  .tbl tr.cur td{background:var(--accent-soft);color:var(--accent-ink);font-weight:600}
   .tblwrap{margin-top:10px;border:1px solid var(--line);border-radius:8px;max-height:430px;overflow:auto}
   .mtx td,.mtx th{text-align:center}
   .mtx td:first-child,.mtx th:first-child{text-align:left}
@@ -142,13 +159,165 @@
     margin:16px 0 8px;display:flex;align-items:center;gap:8px}
   h3.sec:first-child{margin-top:0}
   h3.sec::after{content:'';flex:1;height:1px;background:var(--line)}
+  /* 图标（Lucide 内联 SVG sprite）：描边走 currentColor，自动跟随主题色 */
+  .ico{width:1em;height:1em;flex:none;fill:none;stroke:currentColor;stroke-width:2;
+    stroke-linecap:round;stroke-linejoin:round;vertical-align:-.125em;margin-right:.35em}
+  .ico.bad{color:var(--bad)}
 </style>
 </head>
 <body>
+<!-- @@ICONS@@ 由 scripts/make_icons.js 生成，勿手改 @@ -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+  <symbol id="i-arrow-down-to-line" viewBox="0 0 24 24"><path d="M12 17V3" /> <path d="m6 11 6 6 6-6" /> <path d="M19 21H5" /></symbol>
+  <symbol id="i-ban" viewBox="0 0 24 24"><path d="M4.929 4.929 19.07 19.071" /> <circle cx="12" cy="12" r="10" /></symbol>
+  <symbol id="i-book-open" viewBox="0 0 24 24"><path d="M12 7v14" /> <path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" /></symbol>
+  <symbol id="i-camera" viewBox="0 0 24 24"><path d="M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z" /> <circle cx="12" cy="13" r="3" /></symbol>
+  <symbol id="i-circle-dashed" viewBox="0 0 24 24"><path d="M10.1 2.182a10 10 0 0 1 3.8 0" /> <path d="M13.9 21.818a10 10 0 0 1-3.8 0" /> <path d="M17.609 3.721a10 10 0 0 1 2.69 2.7" /> <path d="M2.182 13.9a10 10 0 0 1 0-3.8" /> <path d="M20.279 17.609a10 10 0 0 1-2.7 2.69" /> <path d="M21.818 10.1a10 10 0 0 1 0 3.8" /> <path d="M3.721 6.391a10 10 0 0 1 2.7-2.69" /> <path d="M6.391 20.279a10 10 0 0 1-2.69-2.7" /></symbol>
+  <symbol id="i-compass" viewBox="0 0 24 24"><path d="m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z" /> <circle cx="12" cy="12" r="10" /></symbol>
+  <symbol id="i-crosshair" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /> <line x1="22" x2="18" y1="12" y2="12" /> <line x1="6" x2="2" y1="12" y2="12" /> <line x1="12" x2="12" y1="6" y2="2" /> <line x1="12" x2="12" y1="22" y2="18" /></symbol>
+  <symbol id="i-grid-3x3" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2" /> <path d="M3 9h18" /> <path d="M3 15h18" /> <path d="M9 3v18" /> <path d="M15 3v18" /></symbol>
+  <symbol id="i-hard-hat" viewBox="0 0 24 24"><path d="M10 10V5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5" /> <path d="M14 6a6 6 0 0 1 6 6v3" /> <path d="M4 15v-3a6 6 0 0 1 6-6" /> <rect x="2" y="15" width="20" height="4" rx="1" /></symbol>
+  <symbol id="i-hexagon" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" /></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z" /> <path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12" /> <path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17" /></symbol>
+  <symbol id="i-map-pin" viewBox="0 0 24 24"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" /> <circle cx="12" cy="10" r="3" /></symbol>
+  <symbol id="i-map-pin-plus" viewBox="0 0 24 24"><path d="M19.914 11.105A7.298 7.298 0 0 0 20 10a8 8 0 0 0-16 0c0 4.993 5.539 10.193 7.399 11.799a1 1 0 0 0 1.202 0 32 32 0 0 0 .824-.738" /> <circle cx="12" cy="10" r="3" /> <path d="M16 18h6" /> <path d="M19 15v6" /></symbol>
+  <symbol id="i-maximize-2" viewBox="0 0 24 24"><path d="M15 3h6v6" /> <path d="m21 3-7 7" /> <path d="m3 21 7-7" /> <path d="M9 21H3v-6" /></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401" /></symbol>
+  <symbol id="i-radar" viewBox="0 0 24 24"><path d="M19.07 4.93A10 10 0 0 0 6.99 3.34" /> <path d="M4 6h.01" /> <path d="M2.29 9.62A10 10 0 1 0 21.31 8.35" /> <path d="M16.24 7.76A6 6 0 1 0 8.23 16.67" /> <path d="M12 18h.01" /> <path d="M17.99 11.66A6 6 0 0 1 15.77 16.67" /> <circle cx="12" cy="12" r="2" /> <path d="m13.41 10.59 5.66-5.66" /></symbol>
+  <symbol id="i-route" viewBox="0 0 24 24"><circle cx="6" cy="19" r="3" /> <path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15" /> <circle cx="18" cy="5" r="3" /></symbol>
+  <symbol id="i-ruler" viewBox="0 0 24 24"><path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z" /> <path d="m14.5 12.5 2-2" /> <path d="m11.5 9.5 2-2" /> <path d="m8.5 6.5 2-2" /> <path d="m17.5 15.5 2-2" /></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915" /> <circle cx="12" cy="12" r="3" /></symbol>
+  <symbol id="i-sliders-horizontal" viewBox="0 0 24 24"><path d="M10 5H3" /> <path d="M12 19H3" /> <path d="M14 3v4" /> <path d="M16 17v4" /> <path d="M21 12h-9" /> <path d="M21 19h-5" /> <path d="M21 5h-7" /> <path d="M8 10v4" /> <path d="M8 12H3" /></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" /> <path d="M12 2v2" /> <path d="M12 20v2" /> <path d="m4.93 4.93 1.41 1.41" /> <path d="m17.66 17.66 1.41 1.41" /> <path d="M2 12h2" /> <path d="M20 12h2" /> <path d="m6.34 17.66-1.41 1.41" /> <path d="m19.07 4.93-1.41 1.41" /></symbol>
+  <symbol id="i-triangle-alert" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /> <path d="M12 9v4" /> <path d="M12 17h.01" /></symbol>
+  <symbol id="i-wrench" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z" /></symbol>
+</svg>
+<!-- @@/ICONS@@ -->
+<script>
+/* @@ICONS@@ 图标辅助（由 scripts/make_icons.js 生成，勿手改） */
+const ICON_PATHS = {
+  "arrow-down-to-line": "<path d=\"M12 17V3\" /> <path d=\"m6 11 6 6 6-6\" /> <path d=\"M19 21H5\" />",
+  "ban": "<path d=\"M4.929 4.929 19.07 19.071\" /> <circle cx=\"12\" cy=\"12\" r=\"10\" />",
+  "book-open": "<path d=\"M12 7v14\" /> <path d=\"M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z\" />",
+  "camera": "<path d=\"M13.997 4a2 2 0 0 1 1.76 1.05l.486.9A2 2 0 0 0 18.003 7H20a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h1.997a2 2 0 0 0 1.759-1.048l.489-.904A2 2 0 0 1 10.004 4z\" /> <circle cx=\"12\" cy=\"13\" r=\"3\" />",
+  "circle-dashed": "<path d=\"M10.1 2.182a10 10 0 0 1 3.8 0\" /> <path d=\"M13.9 21.818a10 10 0 0 1-3.8 0\" /> <path d=\"M17.609 3.721a10 10 0 0 1 2.69 2.7\" /> <path d=\"M2.182 13.9a10 10 0 0 1 0-3.8\" /> <path d=\"M20.279 17.609a10 10 0 0 1-2.7 2.69\" /> <path d=\"M21.818 10.1a10 10 0 0 1 0 3.8\" /> <path d=\"M3.721 6.391a10 10 0 0 1 2.7-2.69\" /> <path d=\"M6.391 20.279a10 10 0 0 1-2.69-2.7\" />",
+  "compass": "<path d=\"m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z\" /> <circle cx=\"12\" cy=\"12\" r=\"10\" />",
+  "crosshair": "<circle cx=\"12\" cy=\"12\" r=\"10\" /> <line x1=\"22\" x2=\"18\" y1=\"12\" y2=\"12\" /> <line x1=\"6\" x2=\"2\" y1=\"12\" y2=\"12\" /> <line x1=\"12\" x2=\"12\" y1=\"6\" y2=\"2\" /> <line x1=\"12\" x2=\"12\" y1=\"22\" y2=\"18\" />",
+  "grid-3x3": "<rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\" /> <path d=\"M3 9h18\" /> <path d=\"M3 15h18\" /> <path d=\"M9 3v18\" /> <path d=\"M15 3v18\" />",
+  "hard-hat": "<path d=\"M10 10V5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5\" /> <path d=\"M14 6a6 6 0 0 1 6 6v3\" /> <path d=\"M4 15v-3a6 6 0 0 1 6-6\" /> <rect x=\"2\" y=\"15\" width=\"20\" height=\"4\" rx=\"1\" />",
+  "hexagon": "<path d=\"M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z\" />",
+  "layers": "<path d=\"M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z\" /> <path d=\"M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12\" /> <path d=\"M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17\" />",
+  "map-pin": "<path d=\"M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0\" /> <circle cx=\"12\" cy=\"10\" r=\"3\" />",
+  "map-pin-plus": "<path d=\"M19.914 11.105A7.298 7.298 0 0 0 20 10a8 8 0 0 0-16 0c0 4.993 5.539 10.193 7.399 11.799a1 1 0 0 0 1.202 0 32 32 0 0 0 .824-.738\" /> <circle cx=\"12\" cy=\"10\" r=\"3\" /> <path d=\"M16 18h6\" /> <path d=\"M19 15v6\" />",
+  "maximize-2": "<path d=\"M15 3h6v6\" /> <path d=\"m21 3-7 7\" /> <path d=\"m3 21 7-7\" /> <path d=\"M9 21H3v-6\" />",
+  "moon": "<path d=\"M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401\" />",
+  "radar": "<path d=\"M19.07 4.93A10 10 0 0 0 6.99 3.34\" /> <path d=\"M4 6h.01\" /> <path d=\"M2.29 9.62A10 10 0 1 0 21.31 8.35\" /> <path d=\"M16.24 7.76A6 6 0 1 0 8.23 16.67\" /> <path d=\"M12 18h.01\" /> <path d=\"M17.99 11.66A6 6 0 0 1 15.77 16.67\" /> <circle cx=\"12\" cy=\"12\" r=\"2\" /> <path d=\"m13.41 10.59 5.66-5.66\" />",
+  "route": "<circle cx=\"6\" cy=\"19\" r=\"3\" /> <path d=\"M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15\" /> <circle cx=\"18\" cy=\"5\" r=\"3\" />",
+  "ruler": "<path d=\"M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z\" /> <path d=\"m14.5 12.5 2-2\" /> <path d=\"m11.5 9.5 2-2\" /> <path d=\"m8.5 6.5 2-2\" /> <path d=\"m17.5 15.5 2-2\" />",
+  "settings": "<path d=\"M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915\" /> <circle cx=\"12\" cy=\"12\" r=\"3\" />",
+  "sliders-horizontal": "<path d=\"M10 5H3\" /> <path d=\"M12 19H3\" /> <path d=\"M14 3v4\" /> <path d=\"M16 17v4\" /> <path d=\"M21 12h-9\" /> <path d=\"M21 19h-5\" /> <path d=\"M21 5h-7\" /> <path d=\"M8 10v4\" /> <path d=\"M8 12H3\" />",
+  "sun": "<circle cx=\"12\" cy=\"12\" r=\"4\" /> <path d=\"M12 2v2\" /> <path d=\"M12 20v2\" /> <path d=\"m4.93 4.93 1.41 1.41\" /> <path d=\"m17.66 17.66 1.41 1.41\" /> <path d=\"M2 12h2\" /> <path d=\"M20 12h2\" /> <path d=\"m6.34 17.66-1.41 1.41\" /> <path d=\"m19.07 4.93-1.41 1.41\" />",
+  "triangle-alert": "<path d=\"m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3\" /> <path d=\"M12 9v4\" /> <path d=\"M12 17h.01\" />",
+  "wrench": "<path d=\"M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z\" />"
+};
+
+/* 供 HTML 内联使用：<svg class="ico"><use href="#i-name"/></svg> */
+function icon(name, cls) {
+  return '<svg class="ico' + (cls ? ' ' + cls : '') + '" aria-hidden="true"><use href="#i-' + name + '"/></svg>';
+}
+
+/* 供 canvas 使用：canvas 画不了 <use>，必须走独立 SVG 图片。
+   颜色与线宽烧进 data-URI（canvas 里没法用 currentColor）。 */
+const _uriCache = new Map();
+function iconURI(name, color, strokeWidth) {
+  const key = name + '|' + (color || '') + '|' + (strokeWidth || '');
+  let uri = _uriCache.get(key);
+  if (uri) return uri;
+  const svg =
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"' +
+    ' stroke="' + (color || '#fff') + '" stroke-width="' + (strokeWidth || 2) + '"' +
+    ' stroke-linecap="round" stroke-linejoin="round">' + ICON_PATHS[name] + '</svg>';
+  uri = 'data:image/svg+xml,' + encodeURIComponent(svg);
+  _uriCache.set(key, uri);
+  return uri;
+}
+
+/* canvas 用图标需预加载成 Image 后再 drawImage；这里做一次性预热缓存。
+   SVG data-URI 的解码是异步的，首次 drawImage 会画不出东西，
+   所以支持传 onReady：图还没就绪时登记回调，解码完成后回调一次（用于重绘）。 */
+const _imgCache = new Map();
+function iconImage(name, color, strokeWidth, onReady) {
+  const key = name + '|' + (color || '') + '|' + (strokeWidth || '');
+  let img = _imgCache.get(key);
+  if (!img) {
+    img = new Image();
+    img._ready = [];
+    img.onload = function () {
+      const fs = img._ready; img._ready = [];
+      for (const f of fs) f();
+    };
+    img.src = iconURI(name, color, strokeWidth);
+    _imgCache.set(key, img);
+  }
+  // 已解码完的不用回调（当前这帧就能画对）；未就绪的去重登记
+  if (onReady && !img.complete && img._ready.indexOf(onReady) < 0) img._ready.push(onReady);
+  return img;
+}
+window.ICONS = { ICON_PATHS, icon, iconURI, iconImage };
+</script>
+<!-- @@/ICONSJS@@ -->
+<!-- @@WEAPONS_BEGIN@@ -->
+<script>
+/* @@WEAPONS@@ 武器射表（由 scripts/make_weapons.js 生成，勿手改） */
+(function(){
+  const WEAPONS = [{"id":"mortar","name":"L81 迫击炮","nameEn":"L81 Mortar","minR":132,"maxR":684,"minElev":150,"maxElev":850,"arcs":[{"key":"single","label":"单弹道","reversed":false,"dropped":0,"tbl":[[80,950],[87,940],[93,930],[99,920],[105,910],[110,900],[115,890],[118,880],[122,870],[127,860],[132,850],[140,840],[151,830],[163,820],[175,810],[187,800],[198,790],[208,780],[219,770],[229,760],[239,750],[250,740],[260,730],[270,720],[280,710],[290,700],[300,690],[310,680],[319,670],[329,660],[339,650],[348,640],[358,630],[367,620],[376,610],[385,600],[394,590],[403,580],[412,570],[420,560],[429,550],[437,540],[446,530],[454,520],[462,510],[470,500],[478,490],[486,480],[494,470],[501,460],[509,450],[516,440],[524,430],[531,420],[538,410],[545,400],[552,390],[559,380],[565,370],[572,360],[578,350],[585,340],[591,330],[597,320],[603,310],[609,300],[615,290],[620,280],[626,270],[631,260],[636,250],[641,240],[646,230],[651,220],[656,210],[661,200],[666,190],[670,180],[675,170],[680,160],[684,150],[688,140],[693,130],[697,120]]}]},{"id":"spg","name":"SPH-2 自行火炮","nameEn":"SPH-2","minR":780,"maxR":2629,"minElev":20,"maxElev":1390,"arcs":[{"key":"low","label":"低弹道","reversed":false,"dropped":0,"tbl":[[1181,20],[1232,30],[1283,40],[1334,50],[1384,60],[1433,70],[1482,80],[1529,90],[1576,100],[1622,110],[1666,120],[1709,130],[1751,140],[1792,150],[1832,160],[1870,170],[1907,180],[1944,190],[1979,200],[2014,210],[2046,220],[2079,230],[2110,240],[2139,250],[2168,260],[2196,270],[2223,280],[2249,290],[2273,300],[2296,310],[2319,320],[2341,330],[2362,340],[2383,350],[2403,360],[2422,370],[2439,380],[2456,390],[2471,400],[2485,410],[2499,420],[2513,430],[2526,440],[2538,450],[2550,460],[2561,470],[2570,480],[2579,490],[2586,500],[2593,510],[2599,520],[2605,530],[2610,540],[2615,550],[2620,560],[2623,570],[2626,580],[2628,590],[2629,600]]},{"key":"high","label":"高弹道","reversed":true,"dropped":1,"tbl":[[735,1400],[780,1390],[825,1380],[869,1370],[913,1360],[956,1350],[999,1340],[1041,1330],[1083,1320],[1124,1310],[1165,1300],[1205,1290],[1245,1280],[1285,1270],[1324,1260],[1363,1250],[1401,1240],[1438,1230],[1475,1220],[1512,1210],[1547,1200],[1582,1190],[1616,1180],[1650,1170],[1684,1160],[1717,1150],[1750,1140],[1782,1130],[1813,1120],[1844,1110],[1875,1100],[1905,1090],[1934,1080],[1963,1070],[1991,1060],[2019,1050],[2046,1040],[2072,1030],[2098,1020],[2123,1010],[2147,1000],[2171,990],[2194,980],[2217,970],[2239,960],[2261,950],[2282,940],[2303,930],[2323,920],[2342,910],[2360,900],[2378,890],[2395,880],[2412,870],[2429,860],[2444,850],[2460,840],[2474,830],[2488,820],[2501,810],[2513,800],[2524,790],[2536,780],[2546,770],[2557,760],[2567,750],[2576,740],[2584,730],[2592,720],[2599,710],[2604,700],[2609,690],[2613,680],[2617,670],[2621,660],[2624,650],[2626,640],[2628,630],[2629,610]]}]}];
+  const DEFAULT_WEAPON = "mortar";
+
+  /* 表内插值：给定距离求密位。表必须按距离升序（见 scripts/make_weapons.js）。 */
+  function rangeToMil(r, tbl){
+    if (r <= tbl[0][0]) return tbl[0][1];
+    const last = tbl[tbl.length - 1];
+    if (r >= last[0]) return last[1];
+    for (let i = 0; i < tbl.length - 1; i++){
+      const [r1, m1] = tbl[i], [r2, m2] = tbl[i + 1];
+      if (r <= r2) return m1 + (r - r1) * (m2 - m1) / (r2 - r1);
+    }
+    return last[1];
+  }
+
+  /* 反向插值：给定密位求落点距离。
+     密位随距离是升是降要看具体弹道弧——迫击炮 950→120 递减，
+     SPH-2 低弹道 20→600 递增。所以这里先判断方向再插值，
+     不然低弹道会算出完全相反的答案。 */
+  function milToRange(m, tbl){
+    const last = tbl[tbl.length - 1];
+    const asc = last[1] > tbl[0][1];
+    if (asc ? m <= tbl[0][1] : m >= tbl[0][1]) return tbl[0][0];
+    if (asc ? m >= last[1]  : m <= last[1])  return last[0];
+    for (let i = 0; i < tbl.length - 1; i++){
+      const [r1, m1] = tbl[i], [r2, m2] = tbl[i + 1];
+      if (asc ? m <= m2 : m >= m2) return r1 + (m - m1) * (r2 - r1) / (m2 - m1);
+    }
+    return last[0];
+  }
+
+  /* 某个距离上有哪几条弹道可用。SPG 的 780–1181 m 只有高弹道，
+     1181 m 以上低/高两条都有——这是自行火炮最容易被忽略的一点。 */
+  function arcsFor(w, r){
+    return w.arcs.filter(a => r >= a.tbl[0][0] && r <= a.tbl[a.tbl.length - 1][0]
+                              && r >= w.minR && r <= w.maxR);
+  }
+  function weaponById(id){
+    return WEAPONS.find(w => w.id === id) || WEAPONS.find(w => w.id === DEFAULT_WEAPON);
+  }
+  window.WEAPONS_API = { WEAPONS, DEFAULT_WEAPON, rangeToMil, milToRange, arcsFor, weaponById };
+})();
+</script>
+<!-- @@/WEAPONSJS@@ -->
 <div class="wrap">
   <header class="top">
     <h1><span class="tag">WARDOGS</span>战术工具箱</h1>
-    <span class="sub">迫击炮诸元 · 测距标绘 · 情报速查 · 射表 —— 全离线，1 格 = 100 m</span>
+    <span class="sub">火炮诸元 · 测距标绘 · 情报速查 · 射表 —— 全离线，1 格 = 100 m</span>
   </header>
 
   <main>
@@ -181,8 +350,8 @@
           <span><i style="background:#a3322c"></i>目标</span>
           <span><i style="background:#a8621a"></i>弹坑</span>
           <span><i style="background:#2a5f9e"></i>落点</span>
-          <span><i style="background:none;border:1.5px dashed #2f6f4f"></i>684 m</span>
-          <span><i style="background:none;border:1.5px dashed #a3322c"></i>132 m</span>
+          <span><i style="background:none;border:1.5px dashed #2f6f4f"></i><b id="lgMaxR">—</b></span>
+          <span><i style="background:none;border:1.5px dashed #a3322c"></i><b id="lgMinR">—</b></span>
         </div>
       </div>
     </section>
@@ -262,12 +431,12 @@
       <!-- ================= 工具 ================= -->
       <div class="pane" id="pane-tools">
         <div class="toolgrid" id="toolGrid">
-          <button data-tool="ruler" class="on" type="button">📏 测距</button>
-          <button data-tool="circle" type="button">⭕ 半径圈</button>
-          <button data-tool="ray" type="button">🧭 方位线</button>
-          <button data-tool="marker" type="button">📍 标记</button>
-          <button data-tool="route" type="button">🚶 路线</button>
-          <button data-tool="poly" type="button">⬟ 区域</button>
+          <button data-tool="ruler" class="on" type="button"><svg class="ico" aria-hidden="true"><use href="#i-ruler"/></svg>测距</button>
+          <button data-tool="circle" type="button"><svg class="ico" aria-hidden="true"><use href="#i-circle-dashed"/></svg>半径圈</button>
+          <button data-tool="ray" type="button"><svg class="ico" aria-hidden="true"><use href="#i-compass"/></svg>方位线</button>
+          <button data-tool="marker" type="button"><svg class="ico" aria-hidden="true"><use href="#i-map-pin"/></svg>标记</button>
+          <button data-tool="route" type="button"><svg class="ico" aria-hidden="true"><use href="#i-route"/></svg>路线</button>
+          <button data-tool="poly" type="button"><svg class="ico" aria-hidden="true"><use href="#i-hexagon"/></svg>区域</button>
         </div>
         <div id="out-tool"></div>
       </div>
@@ -275,13 +444,13 @@
       <!-- ================= 情报 ================= -->
       <div class="pane" id="pane-intel">
         <h3 class="sec">炮位推荐 —— 谁能打到当前目标</h3>
-        <p class="muted" style="margin:0 0 8px">把你的自定义标记和地标当作候选炮位，按到目标的距离排序。L81 有效射程 <b>132–684 m</b>。</p>
+        <p class="muted" style="margin:0 0 8px">把你的自定义标记和地标当作候选炮位，按到目标的距离排序。<b id="intelRng1"></b></p>
         <div class="list" id="listCand" style="max-height:240px"></div>
         <h3 class="sec">出生点决策 —— 到各塔楼距离</h3>
         <p class="muted" style="margin:0 0 8px">三个出生点（Valkyra / Manticore / Lonestar）到每座塔楼的直线距离，圈出来的是最优出生点。</p>
         <div class="tblwrap" style="max-height:240px"><div id="mtxSpawn"></div></div>
         <h3 class="sec">打击范围分析（以当前炮位为圆心）</h3>
-        <p class="muted" style="margin:0 0 8px">全部地标 + 自定义标记按距离排序。L81 有效射程 <b>132–684 m</b>，圈外就是打不着。</p>
+        <p class="muted" style="margin:0 0 8px">全部地标 + 自定义标记按距离排序。<b id="intelRng2"></b>，圈外就是打不着。</p>
         <div class="list" id="listRange" style="max-height:300px"></div>
         <h3 class="sec">地标速查</h3>
         <div class="segrow"><label>筛选</label>
@@ -317,7 +486,7 @@
         <h3 class="sec">地图规划器</h3>
         <div class="segrow">
           <select id="buildSel" style="flex:1 1 200px;padding:8px;border:1px solid var(--line-strong);border-radius:7px;background:var(--input-bg);color:var(--ink);font:inherit"></select>
-          <button class="btn pri" id="btnBuildArm" type="button">⬇ 放到地图上</button>
+          <button class="btn pri" id="btnBuildArm" type="button"><svg class="ico" aria-hidden="true"><use href="#i-arrow-down-to-line"/></svg>放到地图上</button>
         </div>
         <p class="muted" style="margin:8px 0 0">FOB 半径 60 m（蓝色圈，游戏内显示为蓝色方块）。需要 FOB 的建筑放在圈外会标红提示。</p>
         <div class="list" id="listBuilds" style="max-height:200px"></div>
@@ -325,7 +494,8 @@
 
       <!-- ================= 射表 ================= -->
       <div class="pane" id="pane-table">
-        <p class="muted" style="margin:0 0 10px">L81 完整射表（社区测量，84 档）。算诸元时对应的档位会自动高亮。</p>
+        <p class="muted" id="tblTitle" style="margin:0 0 10px">完整射表（社区测量）。算诸元时对应的档位会自动高亮。</p>
+        <div id="tblBar"></div>
         <div class="segrow">
           <input type="text" id="tblQ" placeholder="输入距离(m)或密位反查，如 300 或 690" style="flex:1 1 200px">
           <button class="btn" id="btnTblClr" type="button">清除</button>
@@ -339,7 +509,7 @@
       <div class="pane" id="pane-settings">
         <h3 class="sec">外观</h3>
         <div class="segrow">
-          <button class="btn" id="btnTheme" type="button">🌙 夜间模式</button>
+          <button class="btn" id="btnTheme" type="button"><svg class="ico" aria-hidden="true"><use href="#i-moon"/></svg>夜间模式</button>
           <button class="btn" id="btnShowMarks" type="button">自定义标记：开</button>
         </div>
         <h3 class="sec">数据备份</h3>
@@ -383,45 +553,91 @@
 </div>
 
 <script>
+
+/* canvas 图标：iconImage 的 data-URI 解码是异步的，首帧画不出，
+   就绪后回调重绘一次（与 app/renderer/engine.js 的 icoImg 同源） */
+function redrawIcon(){ draw(); }
+const icoImg = (n, c, w) => iconImage(n, c, w, redrawIcon);
 /* ============================================================
    L81 迫击炮射表（社区测量, [距离m, 密位]）
    数据源: apollyon-sys/wardogs-calculator · MIT
    ============================================================ */
-const TBL = [
-  [80,950],[87,940],[93,930],[99,920],[105,910],[110,900],[115,890],[118,880],[122,870],[127,860],
-  [132,850],[140,840],[151,830],[163,820],[175,810],[187,800],[198,790],[208,780],[219,770],[229,760],
-  [239,750],[250,740],[260,730],[270,720],[280,710],[290,700],[300,690],[310,680],[319,670],[329,660],
-  [339,650],[348,640],[358,630],[367,620],[376,610],[385,600],[394,590],[403,580],[412,570],[420,560],
-  [429,550],[437,540],[446,530],[454,520],[462,510],[470,500],[478,490],[486,480],[494,470],[501,460],
-  [509,450],[516,440],[524,430],[531,420],[538,410],[545,400],[552,390],[559,380],[565,370],[572,360],
-  [578,350],[585,340],[591,330],[597,320],[603,310],[609,300],[615,290],[620,280],[626,270],[631,260],
-  [636,250],[641,240],[646,230],[651,220],[656,210],[661,200],[666,190],[670,180],[675,170],[680,160],
-  [684,150],[688,140],[693,130],[697,120]
-];
-const MIN_R = 132, MAX_R = 684;
+/* 射表与武器数据统一来自 window.WEAPONS_API（由 scripts/make_weapons.js 从
+   社区测量数据生成，页面头部已内联）。这里不再有硬编码的 TBL / MIN_R / MAX_R：
+   射程和射表都随武器变，一律走下面的 W() / ARC()。 */
+const WEAPONS      = window.WEAPONS_API.WEAPONS;
+const DEFAULT_WEAPON = window.WEAPONS_API.DEFAULT_WEAPON;
+const rangeToMil   = window.WEAPONS_API.rangeToMil;
+const milToRange   = window.WEAPONS_API.milToRange;
+const arcsFor      = window.WEAPONS_API.arcsFor;
+const weaponById   = window.WEAPONS_API.weaponById;
 const MOA50 = Math.tan(50/60 * Math.PI/180);
 const MAPS={"bakurani": {"id": "bakurani","name": "Bakurani","bounds": {"minX": 23.35,"maxX": 133.6,"minY": 19.34,"maxY": 129.65},"tiles": {"path": "https://assets.wardogs-artillery.com/releases/assets-v1/maps/tiles/bakurani","tileSize": 256,"minZoom": 0,"maxZoom": 7,"extension": "webp"},"markers": [{"x": 83.64,"y": 72.85,"label": "Tower 4","icon": "tower","minZoom": 0.4},{"x": 77.19,"y": 73.44,"label": "Tower 3","icon": "tower","minZoom": 0.4},{"x": 77.19,"y": 70.0,"label": "Tower 2","icon": "tower","minZoom": 0.4},{"x": 80.52,"y": 69.85,"label": "Tower 1","icon": "tower","minZoom": 0.4},{"x": 82.22,"y": 68.41,"label": "Tower 5","icon": "tower","minZoom": 0.4},{"x": 118.75,"y": 70.93,"label": "Valkyra","icon": "valkyra","minZoom": 10},{"x": 118.3,"y": 70.73,"label": "Weapons Vendor","icon": "weapons_vendor","minZoom": 10},{"x": 118.14,"y": 70.45,"label": "Garage Vendor","icon": "garage_vendor","minZoom": 10},{"x": 118.37,"y": 70.49,"label": "Spawn Board","icon": "spawn_board","minZoom": 10},{"x": 40.09,"y": 77.52,"label": "Manticore","icon": "manticore","minZoom": 10},{"x": 39.77,"y": 77.65,"label": "Weapons Vendor","icon": "weapons_vendor","minZoom": 10},{"x": 40.1,"y": 77.31,"label": "Garage Vendor","icon": "garage_vendor","minZoom": 10},{"x": 39.68,"y": 77.48,"label": "Spawn Board","icon": "spawn_board","minZoom": 10},{"x": 87.46,"y": 32.5,"label": "Lonestar","icon": "lonestar","minZoom": 10},{"x": 87.2,"y": 32.68,"label": "Weapons Vendor","icon": "weapons_vendor","minZoom": 10},{"x": 86.84,"y": 32.64,"label": "Garage Vendor","icon": "garage_vendor","minZoom": 10},{"x": 87.06,"y": 32.72,"label": "Spawn Board","icon": "spawn_board","minZoom": 10}]},"ozeti": {"id": "ozeti","name": "Ozeti","bounds": {"minX": 57.58,"maxX": 143.07,"minY": 21.81,"maxY": 99.56},"tiles": {"path": "https://assets.wardogs-artillery.com/releases/assets-v1/maps/tiles/ozeti","tileSize": 256,"minZoom": 0,"maxZoom": 7,"extension": "webp"},"markers": [{"x": 100.62,"y": 67.64,"label": "Tower 4","icon": "tower","minZoom": 0.4},{"x": 104.49,"y": 63.71,"label": "Tower 3","icon": "tower","minZoom": 0.4},{"x": 100.37,"y": 59.23,"label": "Tower 2","icon": "tower","minZoom": 0.4},{"x": 95.8,"y": 62.82,"label": "Tower 1","icon": "tower","minZoom": 0.4},{"x": 118.75,"y": 70.93,"label": "Valkyra","icon": "valkyra","minZoom": 10},{"x": 138.03,"y": 67.33,"label": "Weapons Vendor","icon": "weapons_vendor","minZoom": 10},{"x": 137.9,"y": 67.07,"label": "Garage Vendor","icon": "garage_vendor","minZoom": 10},{"x": 137.88,"y": 67.26,"label": "Spawn Board","icon": "spawn_board","minZoom": 10},{"x": 68.28,"y": 88.03,"label": "Manticore","icon": "manticore","minZoom": 10},{"x": 68.54,"y": 88.16,"label": "Weapons Vendor","icon": "weapons_vendor","minZoom": 10},{"x": 68.66,"y": 87.92,"label": "Garage Vendor","icon": "garage_vendor","minZoom": 10},{"x": 68.42,"y": 87.86,"label": "Spawn Board","icon": "spawn_board","minZoom": 10},{"x": 83.73,"y": 30.69,"label": "Lonestar","icon": "lonestar","minZoom": 10},{"x": 83.85,"y": 30.88,"label": "Weapons Vendor","icon": "weapons_vendor","minZoom": 10},{"x": 83.73,"y": 31.17,"label": "Garage Vendor","icon": "garage_vendor","minZoom": 10},{"x": 83.68,"y": 31.04,"label": "Spawn Board","icon": "spawn_board","minZoom": 10}]},"zestafona": {"id": "zestafona","name": "Zestafona","bounds": {"minX": 19.9,"maxX": 124.89,"minY": 50.7,"maxY": 141.9},"tiles": {"path": "https://assets.wardogs-artillery.com/releases/assets-v1/maps/tiles/zestafona","tileSize": 256,"minZoom": 0,"maxZoom": 7,"extension": "webp"},"markers": [{"x": 70.172672,"y": 100.1717,"label": "Tower 3","icon": "tower","minZoom": 0.4},{"x": 68.599808,"y": 104.15299999999999,"label": "Tower 1","icon": "tower","minZoom": 0.4},{"x": 72.892416,"y": 105.07059199999999,"label": "Tower 2","icon": "tower","minZoom": 0.4},{"x": 39.436288,"y": 124.94438399999999,"label": "VALKYRA Spawn","icon": "valkyra","minZoom": 10},{"x": 104.66099200000001,"y": 115.081216,"label": "MANTICORE Spawn","icon": "manticore","minZoom": 10},{"x": 68.009984,"y": 66.60096,"label": "LONESTAR","icon": "lonestar","minZoom": 10},{"x": 38.895616,"y": 124.862464,"label": "Spawn Board","icon": "spawn_board","minZoom": 10},{"x": 104.66099200000001,"y": 114.54054400000001,"label": "Garage Vendor","icon": "garage_vendor","minZoom": 10},{"x": 105.054208,"y": 115.294208,"label": "Spawn Board","icon": "spawn_board","minZoom": 10},{"x": 68.23935999999999,"y": 66.322432,"label": "Spawn Board","icon": "spawn_board","minZoom": 10},{"x": 67.82976,"y": 66.502656,"label": "Garage Vendor","icon": "garage_vendor","minZoom": 10},{"x": 39.40352,"y": 124.79692800000001,"label": "Garage Vendor","icon": "garage_vendor","minZoom": 10}]}};
 
-function rangeToMil(r){
-  const t = TBL;
-  if (r <= t[0][0]) return t[0][1];
-  if (r >= t[t.length-1][0]) return t[t.length-1][1];
-  for (let i=0;i<t.length-1;i++){
-    const [r1,m1]=t[i], [r2,m2]=t[i+1];
-    if (r <= r2) return m1 + (r-r1)*(m2-m1)/(r2-r1);
-  }
-  return t[t.length-1][1];
+/* 当前武器与选中的弹道弧。S 在下面才定义，所以用函数按需读。 */
+const W   = () => weaponById(S.weapon);
+/* S.arc 为空或在该武器上不存在时退回默认弧（切换武器时会遇到） */
+const ARC = () => W().arcs.find(a => a.key === S.arc) || W().arcs[0];
+function enforceArc(){ const w = W(); if (!w.arcs.some(a => a.key === S.arc)) S.arc = w.arcs[0].key; }
+/* 给定距离，返回该距离上所有可用弹道弧的解（自行火炮常有两条） */
+function arcSolutions(w, d){
+  return arcsFor(w, d).map(a => ({ key:a.key, label:a.label, tbl:a.tbl, mil:rangeToMil(d, a.tbl) }));
 }
-function milToRange(m){
-  const t = TBL;
-  if (m >= t[0][1]) return t[0][0];
-  if (m <= t[t.length-1][1]) return t[t.length-1][0];
-  for (let i=0;i<t.length-1;i++){
-    const [r1,m1]=t[i], [r2,m2]=t[i+1];
-    if (m >= m2) return r1 + (m-m1)*(r2-r1)/(m2-m1);
-  }
-  return t[t.length-1][0];
+/* 当前选中弧在该距离上的密位；无解返回 null */
+function milAt(d, w = W()){
+  const s = arcSolutions(w, d).find(a => a.key === ARC().key);
+  return s ? s.mil : null;
 }
+/* 密位与射程的增减方向随弹道弧而变：迫击炮 950→120、SPH-2 高弹道 1400→610
+   是「密位调小打得更远」，SPH-2 低弹道 20→600 正相反。别写死。 */
+function milHint(){
+  const t = ARC().tbl;
+  return t[t.length-1][1] > t[0][1] ? '<b>密位调大 = 打得更远</b>' : '<b>密位调小 = 打得更远</b>';
+}
+/* 武器 + 弹道弧切换条。只有一把武器 / 一条弹道时不渲染，免得出现点了没用的按钮。 */
+function weaponBar(){
+  const w = W(), arc = ARC();
+  if (WEAPONS.length < 2 && w.arcs.length < 2) return '';
+  return (WEAPONS.length > 1
+      ? `<div class="segrow" style="margin-bottom:9px">${WEAPONS.map(x =>
+          `<button class="btn${x.id===w.id?' pri':''}" data-wpn="${x.id}" type="button">${x.name}</button>`).join('')}</div>` : '')
+    + (w.arcs.length > 1
+      ? `<div class="segrow" style="margin-bottom:9px">${w.arcs.map(a =>
+          `<button class="btn${a.key===arc.key?' pri':''}" data-arc="${a.key}" type="button">${a.label}</button>`).join('')}</div>` : '');
+}
+/* 页面上几处「静态写死 L81 射程」的文案：地图图例的两个虚线圈就是 min/max 射程，
+   情报页两段说明也写着射程。不跟着武器变的话，换到 SPH-2 后会直接对不上。 */
+function syncWeaponLabels(){
+  const w = W();
+  const rngTxt = `${w.name} 有效射程 ${w.minR}–${w.maxR} m`;
+  const r1 = $('intelRng1'); if (r1) r1.textContent = rngTxt;
+  const r2 = $('intelRng2'); if (r2) r2.textContent = rngTxt;
+  const lmax = $('lgMaxR'); if (lmax) lmax.textContent = w.maxR + ' m';
+  const lmin = $('lgMinR'); if (lmin) lmin.textContent = w.minR + ' m';
+}
+/* 武器/弹道一变，射表和情报里的密位/射程都要跟着重算，这些面板不是 run() 负责的 */
+function refreshPanes(){
+  syncWeaponLabels();
+  if (S.mode === 'table') renderTable();
+  if (S.mode === 'intel') renderIntel();
+}
+function setWeapon(id){
+  if (!WEAPONS.some(w => w.id === id)) return;
+  S.weapon = id; enforceArc(); refreshPanes(); run();
+}
+function setArc(key){
+  if (!W().arcs.some(a => a.key === key)) return;
+  S.arc = key; refreshPanes(); run();
+}
+/* 武器/弹道按钮是动态生成的，用事件委托，免得每次重绘都要重新绑 */
+document.addEventListener('click', e => {
+  const wb = e.target.closest('[data-wpn]');
+  if (wb) { setWeapon(wb.dataset.wpn); return; }
+  const ab = e.target.closest('[data-arc]');
+  if (ab) { setArc(ab.dataset.arc); return; }
+  const pb = e.target.closest('[data-arc-pick]');
+  if (pb) setArc(pb.dataset.arcPick);
+});
 function solveVector(dx, dy){
   const dist = 100 * Math.hypot(dx, dy);
   let az = Math.atan2(dx, dy) * 180/Math.PI;
@@ -451,6 +667,7 @@ function parsePair(s){
    ============================================================ */
 const S = {
   mode:'solve', mapId:'bakurani',
+  weapon: DEFAULT_WEAPON, arc: null,  // 武器与弹道弧；arc=null → 用该武器默认弧
   mortar:null, target:null, impact:null, predPoint:null,
   put:'mortar', showGrid:true, showPoi:true,
   srcMode:'auto',                   // 底图来源: auto | local | cdn
@@ -473,7 +690,14 @@ const S = {
   hist:[],                          // {t,map,txt}
   seq:1
 };
+/* 标记调色板。这些色值是为【浅底】挑的深色，canvas 直接画在地图瓦片上（与页面主题无关），
+   但它们也被拿去做列表项的文字色——深色主题下深字压深底，等于隐形。
+   DOM 里改走 --mk-1..6（随主题切到同色相亮版本），canvas 仍用原色。 */
 const MARK_COLORS = ['#a3322c','#2a5f9e','#a8621a','#7a3f9d','#1c7a7a','#c2185b'];
+const markCss = hex => {
+  const i = MARK_COLORS.indexOf(hex);
+  return i < 0 ? hex : `var(--mk-${i + 1})`;   /* 调色板外的自定义色原样保留 */
+};
 const RADIUS_PRESETS = [100,200,300,400,500,684];
 const $ = id => document.getElementById(id);
 
@@ -481,6 +705,13 @@ const $ = id => document.getElementById(id);
    画布与瓦片
    ============================================================ */
 const canvas = $('map');
+
+/* 指针坐标浮标：跟随指针显示所在地图坐标 */
+const cursorTip = document.createElement('div');
+cursorTip.className = 'cursor-tip';
+cursorTip.hidden = true;
+canvas.parentElement.appendChild(cursorTip);
+canvas.addEventListener('pointerleave', () => { cursorTip.hidden = true; });
 const ctx = canvas.getContext('2d');
 let CW = 0, CH = 0, DPR = 1;
 const tileCache = new Map();       // key -> Image
@@ -641,11 +872,43 @@ function drawTiles(){
   ctx.imageSmoothingEnabled = true;
   for (let ty=y0; ty<=y1; ty++){
     for (let tx=x0; tx<=x1; tx++){
-      const img = getTile(m, tz, tx, ty);
       const sx = tl.x + tx*px, sy = tl.y + ty*py;
+      const img = getTile(m, tz, tx, ty);
       if (img && img.complete && img.naturalWidth){
         ctx.drawImage(img, sx, sy, px+0.6, py+0.6);
+        continue;
       }
+      drawAncestor(m, tz, tx, ty, sx, sy, px, py);
+    }
+  }
+  prefetch(m, tz, x0, y0, x1, y1, n);
+}
+
+/* 目标层这块还没到：向上找最近的已加载祖先层，裁出对应的一小块放大顶上。
+   地图因此永远不会空白，只会「先糊后清晰」——感知速度提升最大的一招。 */
+function drawAncestor(m, tz, tx, ty, sx, sy, px, py){
+  const minZ = m.tiles.minZoom;
+  for (let k = 1; k <= 5; k++){
+    const az = tz - k;
+    if (az < minZ) return false;
+    const f = 1 << k;
+    const aimg = getTile(m, az, tx >> k, ty >> k);
+    if (!(aimg && aimg.complete && aimg.naturalWidth)) continue;
+    const sw = aimg.naturalWidth / f, sh = aimg.naturalHeight / f;
+    ctx.drawImage(aimg, (tx % f) * sw, (ty % f) * sh, sw, sh, sx, sy, px+0.6, py+0.6);
+    return true;
+  }
+  return false;
+}
+
+/* 视野外扩一圈预取：平移时下一屏已经在了，不会「推出了白边再等」 */
+function prefetch(m, tz, x0, y0, x1, y1, n){
+  for (let ty=y0-1; ty<=y1+1; ty++){
+    if (ty < 0 || ty >= n) continue;
+    for (let tx=x0-1; tx<=x1+1; tx++){
+      if (tx < 0 || tx >= n) continue;
+      if (tx >= x0 && tx <= x1 && ty >= y0 && ty <= y1) continue;
+      getTile(m, tz, tx, ty);
     }
   }
 }
@@ -751,11 +1014,14 @@ function drawToolsLayer(){
     drawPolyPath(pg.pts, true, pg.color, fill);
     const c = polyCentroid(pg.pts), s = w2s(c.x, c.y);
     ctx.font = '600 11px system-ui';
-    const txt = (pg.nofire ? '🚫' : '') + pg.name;
-    const tw = ctx.measureText(txt).width + 8;
+    const ico = pg.nofire ? icoImg('ban', pg.color, 2.4) : null;
+    const iw = ico ? 13 : 0;
+    const tw = ctx.measureText(pg.name).width + 8 + iw;
     ctx.fillStyle = 'rgba(255,255,255,.92)';
     ctx.fillRect(s.x-tw/2, s.y-9, tw, 17);
-    ctx.fillStyle = pg.color; ctx.fillText(txt, s.x-tw/2+4, s.y+4);
+    ctx.fillStyle = pg.color;
+    if (ico) ctx.drawImage(ico, s.x-tw/2+4, s.y-6, 11, 11);
+    ctx.fillText(pg.name, s.x-tw/2+4+iw, s.y+4);
   }
   if (S.mode === 'tools' && S.polyDraft && S.polyDraft.pts.length){
     drawPolyPath(S.polyDraft.pts, false, 'rgba(163,50,44,.8)');
@@ -872,8 +1138,9 @@ function noFireHit(p){
 
 function drawSolution(){
   if (S.mortar){
-    ring(S.mortar.x, S.mortar.y, MAX_R, 'rgba(47,111,79,.5)');
-    ring(S.mortar.x, S.mortar.y, MIN_R, 'rgba(163,50,44,.5)');
+    const _w = W();
+    ring(S.mortar.x, S.mortar.y, _w.maxR, 'rgba(47,111,79,.5)');
+    ring(S.mortar.x, S.mortar.y, _w.minR, 'rgba(163,50,44,.5)');
   }
   const showT = S.mode==='solve' || S.mode==='correct';
   if (S.mode==='solve' && S.mortar && S.target){
@@ -930,6 +1197,15 @@ canvas.addEventListener('pointermove', e => {
   const px = e.clientX-r.left, py = e.clientY-r.top;
   const w = s2w(px, py);
   $('cursorCoord').textContent = 'X ' + fx(w.x) + ' / Y ' + fx(w.y);
+  cursorTip.textContent = 'X ' + fx(w.x) + '  Y ' + fx(w.y);
+  cursorTip.style.left = px + 'px';
+  cursorTip.style.top  = py + 'px';
+  /* 贴到右/下边缘时翻到指针另一侧，免得浮标被裁掉（.mapbox 有 overflow:hidden） */
+  const br = canvas.getBoundingClientRect();
+  cursorTip.style.transform = 'translate(' +
+    (px > br.width  - 132 ? 'calc(-100% - 13px)' : '13px') + ',' +
+    (py > br.height - 34  ? 'calc(-100% - 13px)' : '13px') + ')';
+  cursorTip.hidden = false;
   if (drag){
     moved = true;
     const c = clampCoord(w);
@@ -1097,19 +1373,32 @@ function doSolve(){
   if (!mortar || !target){
     o.innerHTML = '<div class="status warn">把炮位和目标的 X / Y 都填上，或者在地图上点两下。</div>'; return;
   }
+  const w = W(), arc = ARC();
   const {dist, az} = solveVector(target.x-mortar.x, target.y-mortar.y);
-  const mil = rangeToMil(dist), milR = Math.round(mil);
-  const distAtMil = milToRange(milR);
+  const sols = arcSolutions(w, dist);
+  const pick = sols.find(a => a.key === arc.key) || sols[0] || null;
+  const mil = pick ? pick.mil : 0, milR = Math.round(mil);
+  const distAtMil = pick ? milToRange(milR, pick.tbl) : 0;
   const spread = dist * MOA50;
   let stCls = 'ok', stTxt = '';
-  if (dist < MIN_R){ stCls='bad'; stTxt = `太近了——低于 L81 最小射程 ${MIN_R} m，这一发打不出去。把炮位往回挪。`; }
-  else if (dist > MAX_R){ stCls='bad'; stTxt = `太远了——超出 L81 最大射程 ${MAX_R} m 约 ${Math.round(dist-MAX_R)} m。往前推炮位。`; }
-  else if (dist > MAX_R-40){ stCls='warn'; stTxt = `贴近最大射程（${MAX_R} m），密位随距离变化极快，能挪近一点就挪近一点。`; }
-  else stTxt = `目标在有效射程内（${MIN_R}–${MAX_R} m）。表内插值密位 ${mil.toFixed(1)}，取整 ${milR} → 对应 ${Math.round(distAtMil)} m。`;
+  if (dist < w.minR){ stCls='bad'; stTxt = `太近了——低于 ${w.name} 最小射程 ${w.minR} m，这一发打不出去。把炮位往回挪。`; }
+  else if (dist > w.maxR){ stCls='bad'; stTxt = `太远了——超出 ${w.name} 最大射程 ${w.maxR} m 约 ${Math.round(dist-w.maxR)} m。往前推炮位。`; }
+  else if (dist > w.maxR-40){ stCls='warn'; stTxt = `贴近最大射程（${w.maxR} m），密位随距离变化极快，能挪近一点就挪近一点。`; }
+  else if (sols.length > 1)
+    stTxt = `目标在有效射程内（${w.minR}–${w.maxR} m），两条弹道都有解：${sols.map(a => a.label+' '+Math.round(a.mil)).join(' / ')} 密位。低弹道更平、受风偏小，优先用。`;
+  else stTxt = `目标在有效射程内（${w.minR}–${w.maxR} m），只有${sols[0] ? sols[0].label : '默认弹道'}可用。表内插值密位 ${mil.toFixed(1)}，取整 ${milR} → 对应 ${Math.round(distAtMil)} m。`;
   S.lastAz = az;
   const nfT = noFireHit(target);
-  const nfHtml = nfT ? `<div class="status bad">🚫 目标位于禁炸区「${nfT.name}」内——确认真的要打这里吗？</div>` : '';
+  const nfHtml = nfT ? `<div class="status bad">${icon('ban')}目标位于禁炸区「${nfT.name}」内——确认真的要打这里吗？</div>` : '';
+  const dualHtml = sols.length > 1 ? `
+    <div class="readout" style="margin-bottom:10px">${sols.map(a => `
+      <div class="ro ${a.key===arc.key?'big':''}" data-arc-pick="${a.key}" style="cursor:pointer">
+        <div class="k">${a.label}${a.key===arc.key?' · 已选':''}</div>
+        <div class="v">${fm0(Math.round(a.mil))}<small>密位</small></div>
+      </div>`).join('')}</div>` : '';
   o.innerHTML = `
+    ${weaponBar()}
+    ${dualHtml}
     <div class="readout">
       <div class="ro big"><div class="k">密位 MIL（右边仰角）</div><div class="v">${fm0(milR)}<small>密位</small></div></div>
       <div class="ro"><div class="k">RNG 距离（左边滑杆）</div><div class="v">${fm0(dist)}<small>m</small></div></div>
@@ -1141,21 +1430,29 @@ function doPredict(){
   if (milIn == null && rngIn == null){ S.predPoint = null;
     o.innerHTML = '<div class="status warn">密位和 RNG 至少填一个。</div>'; return; }
   let dist, srcTxt;
-  if (milIn != null){ dist = milToRange(milIn); srcTxt = `由密位 ${fm0(milIn)} 反查射表`; }
+  const _w = W(), _arc = ARC(), _tmax = _arc.tbl[_arc.tbl.length-1][0];
+  /* 密位喂错弹道很容易犯（低弹道 84 喂给高弹道量程 610–1400），
+     milToRange 会静默夹到端点，看着正常其实全错，所以显式拦一道。 */
+  const _m1 = _arc.tbl[0][1], _m2 = _arc.tbl[_arc.tbl.length-1][1];
+  const _lo = Math.min(_m1, _m2), _hi = Math.max(_m1, _m2);
+  const milOff = milIn != null && (milIn < _lo || milIn > _hi);
+  if (milIn != null){ dist = milToRange(milIn, _arc.tbl); srcTxt = `由${_arc.label}密位 ${fm0(milIn)} 反查射表`; }
   else { dist = rngIn; srcTxt = '由 RNG 距离直接给出'; }
   const pt = unitToXY(mortar.x, mortar.y, azIn, dist);
   const clX = Math.max(0, Math.min(163.84, pt.x)), clY = Math.max(0, Math.min(163.84, pt.y));
   const off = Math.abs(clX-pt.x) > 1e-9 || Math.abs(clY-pt.y) > 1e-9;
   const c = { x: Math.round(clX*100)/100, y: Math.round(clY*100)/100 };
   S.predPoint = c;
-  const milBack = rangeToMil(dist);
+  const milBack = rangeToMil(dist, _arc.tbl);
   let stCls='ok', stTxt='';
-  if (dist < MIN_R){ stCls='bad'; stTxt = `射程 ${Math.round(dist)} m 低于最小射程 ${MIN_R} m，打不到。`; }
-  else if (dist > MAX_R + 13){ stCls='bad'; stTxt = `射程 ${Math.round(dist)} m 超出射表上限，炮弹会在更近处落地。`; }
-  else if (dist > MAX_R){ stCls='warn'; stTxt = `射程 ${Math.round(dist)} m 略超 ${MAX_R} m，已外推，实际会打短。`; }
+  if (milOff){ stCls='bad';
+    stTxt = `密位 ${fm0(milIn)} 不在${_arc.label}的量程（${_lo}–${_hi}）内，已按表端取值，落点不可信。换一条弹道，或改用 RNG 距离。`; }
+  else if (dist < _w.minR){ stCls='bad'; stTxt = `射程 ${Math.round(dist)} m 低于 ${_w.name} 最小射程 ${_w.minR} m，打不到。`; }
+  else if (dist > _tmax + 13){ stCls='bad'; stTxt = `射程 ${Math.round(dist)} m 超出射表上限，炮弹会在更近处落地。`; }
+  else if (dist > _tmax){ stCls='warn'; stTxt = `射程 ${Math.round(dist)} m 略超 ${_arc.label}表上限 ${_tmax} m，已外推，实际会打短。`; }
   else stTxt = `落点如下，${srcTxt}。`;
   const nfP = noFireHit(c);
-  const nfHtml = nfP ? `<div class="status bad">🚫 预测落点位于禁炸区「${nfP.name}」内！先撤销禁炸区或换落点。</div>` : '';
+  const nfHtml = nfP ? `<div class="status bad">${icon('ban')}预测落点位于禁炸区「${nfP.name}」内！先撤销禁炸区或换落点。</div>` : '';
   o.innerHTML = `
     <div class="readout">
       <div class="ro big"><div class="k">预测落点 X / Y</div><div class="v">${fx(c.x)} <small>,</small> ${fx(c.y)}</div></div>
@@ -1182,7 +1479,7 @@ function doCorrect(){
     o.innerHTML = `
       <div class="readout">
         <div class="ro big"><div class="k">弹坑相对炮位</div><div class="v">${Math.round(imp.dist)}<small>m /</small> ${faz(imp.az)}</div></div>
-        <div class="ro"><div class="k">该射程对应密位</div><div class="v">${fm0(rangeToMil(imp.dist))}</div></div>
+        <div class="ro"><div class="k">该射程对应密位</div><div class="v">${fm0(rangeToMil(imp.dist, ARC().tbl))}</div></div>
         <div class="ro"><div class="k">50 MOA 散布</div><div class="v">± ${(imp.dist*MOA50).toFixed(1)}<small>m</small></div></div>
       </div>
       <div class="status warn">没有目标坐标，只能核对弹坑落点。填上目标坐标才是真正的修正量。</div>`;
@@ -1192,7 +1489,7 @@ function doCorrect(){
   let dAz = tgt.az - imp.az;
   while (dAz > 180) dAz -= 360; while (dAz < -180) dAz += 360;
   const dR = tgt.dist - imp.dist;
-  const newMil = Math.round(rangeToMil(tgt.dist));
+  const newMil = Math.round(rangeToMil(tgt.dist, ARC().tbl));
   const drTxt = Math.abs(dR) < 2 ? '距离基本对，只要修方向'
     : (dR > 0 ? `打短了 ${Math.round(dR)} m → 要<b>加距离</b>` : `打远了 ${Math.round(-dR)} m → 要<b>减距离</b>`);
   const daTxt = Math.abs(dAz) < 0.5 ? '方向基本对'
@@ -1205,7 +1502,7 @@ function doCorrect(){
     </div>
     <div class="cmd"><span class="lb">修正口令</span>${Math.abs(dR)>=2 ? (dR>0?'加':'减')+Math.abs(Math.round(dR))+'米 · ' : ''}${Math.abs(dAz)>=0.5 ? (dAz>0?'右转':'左转')+' '+Math.abs(dAz).toFixed(1)+'° · ' : ''}
 方位 ${faz(tgt.az)}，距离 ${fm0(tgt.dist)}，密位 ${fm0(newMil)}</div>
-    <div class="status ok">${drTxt}；${daTxt}。L81 上<b>密位调小 = 打得更远</b>。</div>
+    <div class="status ok">${drTxt}；${daTxt}。${W().name}/${ARC().label} 上 ${milHint()}。</div>
     <div class="kv">
       <div><span>目标距离 / 方位</span><span>${Math.round(tgt.dist)} m / ${faz(tgt.az)}</span></div>
       <div><span>弹坑距离 / 方位</span><span>${Math.round(imp.dist)} m / ${faz(imp.az)}</span></div>
@@ -1223,7 +1520,8 @@ function copy(txt){
 }
 let flashT = 0;
 function flash(msg){
-  const d = document.createElement('div'); d.textContent = msg;
+  // innerHTML：msg 只来自本文件内的字面量与数字拼接，无外部输入
+  const d = document.createElement('div'); d.innerHTML = msg;
   d.style.cssText = 'position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#1c2024;'+
     'color:#fff;font:12.5px system-ui;padding:8px 14px;border-radius:7px;z-index:99';
   document.body.appendChild(d);
@@ -1282,11 +1580,11 @@ function logShot(txt){
 }
 $('btnSolve').onclick   = () => { run(); if (S.mortar && S.target){
   const {dist,az} = solveVector(S.target.x-S.mortar.x, S.target.y-S.mortar.y);
-  logShot(`算诸元 → 方位 ${faz(az)} 距离 ${fm0(dist)} 密位 ${fm0(rangeToMil(dist))}`); save(); } };
+  logShot(`算诸元[${W().name}/${ARC().label}] → 方位 ${faz(az)} 距离 ${fm0(dist)} 密位 ${fm0(milAt(dist))}`); save(); } };
 $('btnPredict').onclick = () => { run(); if (S.predPoint)
   logShot(`推落点 → ${fx(S.predPoint.x)}, ${fx(S.predPoint.y)}`); save(); };
 $('btnCorrect').onclick = () => { run(); if (S.mortar && S.impact && S.target)
-  logShot(`修偏差 → 密位 ${fm0(rangeToMil(solveVector(S.target.x-S.mortar.x, S.target.y-S.mortar.y).dist))}`); save(); };
+  logShot(`修偏差[${W().name}/${ARC().label}] → 密位 ${fm0(milAt(solveVector(S.target.x-S.mortar.x, S.target.y-S.mortar.y).dist))}`); save(); };
 
 /* ---------- 工具面板 ---------- */
 function handleToolClick(c){
@@ -1348,7 +1646,7 @@ function placeBuild(c){
   S.builds.push({ id, k:e.k, x:c.x, y:c.y, name:e.n });
   if (!e.fob && e.k !== 'fob'){
     const d = nearestFobDist(c);
-    if (d > FOB_RADIUS) flash('⚠ 不在任何 FOB 半径内（最近 ' + Math.round(d) + ' m），游戏里放不下');
+    if (d > FOB_RADIUS) flash(icon('triangle-alert','bad') + '不在任何 FOB 半径内（最近 ' + Math.round(d) + ' m），游戏里放不下');
   }
   S.buildArm = null;                 // 放置即解除待放；连放多个需再点「放到地图上」
   renderBuild(); draw(); save();
@@ -1370,10 +1668,14 @@ function drawBuildsLayer(){
     ctx.fillStyle = bad ? '#a3322c' : (b.k==='fob' ? '#2b7cc9' : '#2f6f4f'); ctx.fill();
     ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke();
     ctx.font = '600 10.5px system-ui';
-    const tw = ctx.measureText(b.name).width + 8;
+    const col = bad ? '#a3322c' : (b.k==='fob' ? '#2b7cc9' : '#1d4d35');
+    const ico = bad ? icoImg('triangle-alert', col, 2.4) : null;
+    const iw = ico ? 12 : 0;
+    const tw = ctx.measureText(b.name).width + 8 + iw;
     ctx.fillStyle = 'rgba(255,255,255,.94)'; ctx.fillRect(p.x+7, p.y-13, tw, 16);
-    ctx.fillStyle = bad ? '#a3322c' : (b.k==='fob' ? '#2b7cc9' : '#1d4d35');
-    ctx.fillText(b.name + (bad ? ' ⚠圈外' : ''), p.x+11, p.y-1);
+    ctx.fillStyle = col;
+    if (ico) ctx.drawImage(ico, p.x+11, p.y-8, 10, 10);
+    ctx.fillText(b.name, p.x+11+iw, p.y-1);
   }
 }
 function renderToolPane(){
@@ -1399,7 +1701,7 @@ function renderToolPane(){
       + RADIUS_PRESETS.map(r => `<button class="btn" data-pr="${r}" type="button">${r} m</button>`).join('')
       + '</div>'
       + listHtml(S.circles.map(c => `
-          <div class="li"><span class="nm" style="color:#7a3f9d">${c.name}</span>
+          <div class="li"><span class="nm" style="color:var(--mk-4)">${c.name}</span>
             <span class="co">${fx(c.x)}, ${fx(c.y)} · ${Math.round(c.r)} m</span><span class="sp"></span>
             <button class="btn" data-crd="${c.name}" data-d="-50" type="button">-50</button>
             <button class="btn" data-crd="${c.name}" data-d="50" type="button">+50</button>
@@ -1419,7 +1721,7 @@ function renderToolPane(){
   if (S.tool === 'ray'){
     o.innerHTML = '<div class="status warn">点第一下 = 起点，第二下 = 方向。用于报点：「敌人在这条线上」。</div>'
       + listHtml(S.rays.map(ry => `
-          <div class="li"><span class="nm" style="color:#1c7a7a">${ry.name}</span>
+          <div class="li"><span class="nm" style="color:var(--mk-5)">${ry.name}</span>
             <span class="co">${fx(ry.x)}, ${fx(ry.y)} · ${ry.az.toFixed(0)}°</span><span class="sp"></span>
             <button class="btn" data-rdel="${ry.name}" type="button">删</button></div>`),
           S.rays.length ? '' : '<div class="li"><span class="co">还没有方位线</span></div>');
@@ -1471,7 +1773,7 @@ function renderToolPane(){
           <button class="btn" id="pyClose" type="button" ${draftN>=3?'':'disabled'}>闭合区域</button>
           <button class="btn" id="pyCancel" type="button">放弃</button></div>` : '')
       + listHtml(S.polys.map(pg => `
-          <div class="li"><span class="nm" style="color:${pg.color}">${pg.nofire?'🚫 ':''}${pg.name}</span>
+          <div class="li"><span class="nm" style="color:${markCss(pg.color)}">${pg.nofire?icon('ban','bad'):''}${pg.name}</span>
             <span class="co">${pg.pts.length} 个顶点</span><span class="sp"></span>
             <button class="btn" data-pnf="${pg.id}" type="button">${pg.nofire?'改为普通区':'改为禁炸区'}</button>
             <button class="btn" data-pdel="${pg.id}" type="button">删</button></div>`),
@@ -1499,6 +1801,8 @@ let poiFilter = 'all';
 function renderIntel(){
   const m = MAP();
   const spawns = poisOf(m, 'spawn'), towers = poisOf(m, 'tower');
+  /* 射程说明随武器变，写死在 HTML 会导致换到 SPH-2 后还写着 L81 的 132–684 */
+  syncWeaponLabels();
 
   /* 炮位推荐：谁打得到当前目标 */
   if (S.target){
@@ -1506,14 +1810,14 @@ function renderIntel(){
     for (const mk of S.marks) cands.push({ name:mk.name, co:mk, color:mk.color });
     for (const t of towers) cands.push({ name:t.label, co:t });
     for (const sp of spawns) cands.push({ name:sp.label + '（出生点）', co:sp });
-    const mid = (MIN_R + MAX_R) / 2;
-    cands.forEach(c => { c.d = distM(c.co, S.target); c.ok = c.d >= MIN_R && c.d <= MAX_R; });
+    const _w = W(), mid = (_w.minR + _w.maxR) / 2;
+    cands.forEach(c => { c.d = distM(c.co, S.target); c.ok = c.d >= _w.minR && c.d <= _w.maxR; });
     cands.sort((a, b) => (b.ok - a.ok) || (Math.abs(a.d - mid) - Math.abs(b.d - mid)));
     $('listCand').innerHTML = cands.map(c => `
-      <div class="li"><span class="nm" ${c.color?`style="color:${c.color}"`:''}>${c.name}</span>
+      <div class="li"><span class="nm" ${c.color?`style="color:${markCss(c.color)}"`:''}>${c.name}</span>
         <span class="co">→ 目标 ${fm0(c.d)} m</span><span class="sp"></span>
-        ${c.ok ? `<span class="badge ok">可架设 · 密位 ${fm0(rangeToMil(c.d))}</span>`
-               : `<span class="badge bad">${c.d < MIN_R ? '太近' : '超程'}</span>`}
+        ${c.ok ? `<span class="badge ok">可架设 · 密位 ${fm0(milAt(c.d, _w))}${arcSolutions(_w, c.d).length > 1 ? ' · 双解' : ''}</span>`
+               : `<span class="badge bad">${c.d < _w.minR ? '太近' : '超程'}</span>`}
         <button class="btn" data-cd-x="${c.co.x}" data-cd-y="${c.co.y}" type="button">设炮位</button></div>`).join('')
       || '<div class="li"><span class="co">没有候选位置</span></div>';
     $('listCand').querySelectorAll('[data-cd-x]').forEach(b => b.onclick = () => {
@@ -1540,14 +1844,15 @@ function renderIntel(){
   for (const sp of spawns) rngList.push({ name:sp.label, co:sp, kind:'spawn' });
   for (const mk of S.marks) rngList.push({ name:mk.name, co:mk, kind:'mark', color:mk.color });
   if (S.mortar){
-    rngList.forEach(it => { it.d = distM(S.mortar, it.co); it.mil = Math.round(rangeToMil(it.d)); });
+    const _w = W();
+    rngList.forEach(it => { it.d = distM(S.mortar, it.co); it.mil = Math.round(milAt(it.d, _w)); });
     rngList.sort((a, b) => a.d - b.d);
     $('listRange').innerHTML = rngList.map(it => {
-      const inR = it.d >= MIN_R && it.d <= MAX_R;
+      const inR = it.d >= _w.minR && it.d <= _w.maxR;
       const badge = inR ? `<span class="badge ok">可打 · 密位 ${fm0(it.mil)}</span>`
-        : it.d < MIN_R ? `<span class="badge bad">太近 ${fm0(it.d)}</span>`
-        : `<span class="badge bad">超程 +${fm0(it.d-MAX_R)}m</span>`;
-      return `<div class="li"><span class="nm" ${it.color?`style="color:${it.color}"`:''}>${it.name}</span>
+        : it.d < _w.minR ? `<span class="badge bad">太近 ${fm0(it.d)}</span>`
+        : `<span class="badge bad">超程 +${fm0(it.d-_w.maxR)}m</span>`;
+      return `<div class="li"><span class="nm" ${it.color?`style="color:${markCss(it.color)}"`:''}>${it.name}</span>
         <span class="co">${fm0(it.d)} m · 方位 ${faz(solveVector(it.co.x-S.mortar.x, it.co.y-S.mortar.y).az)}</span>
         <span class="sp"></span>${badge}
         <button class="btn" data-ra-x="${it.co.x}" data-ra-y="${it.co.y}" type="button">设目标</button></div>`;
@@ -1558,7 +1863,7 @@ function renderIntel(){
   } else $('listRange').innerHTML = '<div class="li"><span class="co">先在「算诸元」里放一个炮位</span></div>';
   const pois = poisOf(m, poiFilter);
   $('listPoi').innerHTML = pois.map(k => `
-    <div class="li"><span class="nm" style="color:${k.icon==='tower'?'#a3322c':SPAWN_ICONS.includes(k.icon)?'#2f6f4f':'#2a3f5e'}">${k.label}</span>
+    <div class="li"><span class="nm" style="color:${k.icon==='tower'?'var(--bad-ink)':SPAWN_ICONS.includes(k.icon)?'var(--accent-ink)':'var(--mk-2)'}">${k.label}</span>
       <span class="co">${fx(k.x)}, ${fx(k.y)}</span><span class="sp"></span>
       <button class="btn" data-loc-x="${k.x}" data-loc-y="${k.y}" type="button">定位</button>
       <button class="btn" data-tg-x="${k.x}" data-tg-y="${k.y}" type="button">设目标</button></div>`).join('');
@@ -1611,12 +1916,12 @@ function renderBuild(){
       `<option value="${e.k}">${e.n}（${e.s} 建材${e.tier !== '—' ? ' · ' + e.tier + ' 锤' : ''}）</option>`).join('');
   }
   $('btnBuildArm').classList.toggle('on', !!S.buildArm);
-  $('btnBuildArm').textContent = S.buildArm ? '点地图放置…（再点取消）' : '⬇ 放到地图上';
+  $('btnBuildArm').innerHTML = S.buildArm ? '点地图放置…（再点取消）' : icon('arrow-down-to-line') + '放到地图上';
   $('listBuilds').innerHTML = S.builds.map(b => {
     const e = buildEntry(b.k);
     const bad = b.k !== 'fob' && !e.cat.includes('免') && nearestFobDist(b) > FOB_RADIUS;
-    return `<div class="li"><span class="nm" style="color:${b.k==='fob'?'#2b7cc9':bad?'#a3322c':'#1d4d35'}">${b.name}</span>
-      <span class="co">${fx(b.x)}, ${fx(b.y)}${bad ? ' · ⚠圈外' : ''}</span><span class="sp"></span>
+    return `<div class="li"><span class="nm" style="color:${b.k==='fob'?'var(--mk-2)':bad?'var(--bad-ink)':'var(--accent-ink)'}">${b.name}</span>
+      <span class="co">${fx(b.x)}, ${fx(b.y)}${bad ? ' · ' + icon('triangle-alert','bad') + '圈外' : ''}</span><span class="sp"></span>
       <button class="btn" data-bloc="${b.id}" type="button">定位</button>
       <button class="btn" data-bdel="${b.id}" type="button">删</button></div>`;
   }).join('') || '<div class="li"><span class="co">还没有规划点：选好建筑 → 点「放到地图上」→ 在地图上落点</span></div>';
@@ -1641,6 +1946,7 @@ $('btnCalcClr').onclick = () => { S.calcQty = {}; renderBuild(); save(); };
 function renderTable(){
   const q = parseNum($('tblQ').value);
   let bestI = -1, bestErr = 1e9;
+  const w = W(), arc = ARC(), TBL = arc.tbl;
   if (q != null) TBL.forEach(([r, mil], i) => {
     const e1 = Math.abs(r - q), e2 = Math.abs(mil - q);
     const e = Math.min(e1, e2);
@@ -1649,6 +1955,16 @@ function renderTable(){
   $('tblBody').innerHTML = TBL.map(([r, mil], i) => `<tr class="${i===bestI?'cur':''}">
     <td>${r}</td><td>${mil}</td>
     <td>${i ? (mil - TBL[i-1][1] >= 0 ? '+' : '') + (mil - TBL[i-1][1]) : '—'}</td></tr>`).join('');
+  /* 标题、武器/弹道切换条和双弹道提示 */
+  const title = $('tblTitle');
+  if (title) title.textContent = `${w.name} 完整射表（社区测量 · ${TBL.length} 档）`;
+  const bar = $('tblBar');
+  if (bar){
+    bar.innerHTML = weaponBar() + (w.arcs.length > 1
+      ? `<p class="muted" style="margin:0 0 9px">${w.name} 有低/高两条弹道：<b>${w.arcs[0].tbl[0][0]} m 以上两条都有解</b>，`
+        + `${w.arcs[0].tbl[0][0]} m 以下只能打高弹道。低弹道更平、飞行时间短、受风偏小，优先用。</p>`
+      : '');
+  }
   const cur = document.querySelector('#tblBody tr.cur');
   if (cur) cur.scrollIntoView({ block:'center' });
 }
@@ -1658,7 +1974,7 @@ $('btnTblClr').onclick = () => { $('tblQ').value = ''; renderTable(); };
 /* ---------- 设置 ---------- */
 function applyTheme(){
   document.body.classList.toggle('dark', S.theme === 'dark');
-  $('btnTheme').textContent = S.theme === 'dark' ? '☀️ 浅色模式' : '🌙 夜间模式';
+  $('btnTheme').innerHTML = S.theme === 'dark' ? icon('sun') + '浅色模式' : icon('moon') + '夜间模式';
   $('btnShowMarks').textContent = '自定义标记：' + (S.showMarks ? '开' : '关');
 }
 function renderSettings(){
@@ -1721,6 +2037,7 @@ function listHtml(items, empty){
 function save(){
   try { localStorage.setItem('wardogs-mortar-map-v1', JSON.stringify({
     mortar:S.mortar, target:S.target, impact:S.impact, mode:S.mode, mapId:S.mapId,
+    weapon:S.weapon, arc:S.arc,
     az:$('paz').value, mil:$('pmil').value, rng:$('prng').value,
     tool:S.tool, ruler:S.ruler, circles:S.circles, rays:S.rays,
     marks:S.marks, showMarks:S.showMarks, theme:S.theme, hist:S.hist.slice(0,60), seq:S.seq,
@@ -1738,6 +2055,9 @@ function load(){
     const d = JSON.parse(localStorage.getItem('wardogs-mortar-map-v1') || 'null');
     if (!d) return;
     S.mortar = d.mortar || null; S.target = d.target || null; S.impact = d.impact || null;
+    if (d.weapon && WEAPONS.some(w => w.id === d.weapon)) S.weapon = d.weapon;
+    if (d.arc) S.arc = d.arc;
+    enforceArc();
     if (d.az) $('paz').value = d.az;
     if (d.mil) $('pmil').value = d.mil;
     if (d.rng) $('prng').value = d.rng;
@@ -1771,6 +2091,7 @@ document.querySelectorAll('input').forEach(i =>
   i.addEventListener('input', () => { S.predPoint = null; run(); }));
 
 load();
+syncWeaponLabels();   // 图例/情报里的射程文案要在首帧前就对
 applyTheme();
 applySrcMode();
 resize();
