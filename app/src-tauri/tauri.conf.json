@@ -1,0 +1,37 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "WardogsToolbox",
+  "version": "1.0.0",
+  "identifier": "com.wardogs.artillery.toolbox",
+  "build": {
+    "frontendDist": "../renderer"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "WARDOGS 战术工具箱",
+        "url": "index.html?src=auto",
+        "width": 1440,
+        "height": 920,
+        "minWidth": 1080,
+        "minHeight": 680,
+        "resizable": true,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": false,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/icon.ico"
+    ]
+  }
+}

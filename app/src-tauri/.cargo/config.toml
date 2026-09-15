@@ -1,0 +1,4 @@
+# MSVC 目标静态链接 CRT：否则 exe 会依赖 vcruntime140.dll，就不是单文件可拷走的了。
+# 这一条是 Phase 0 验证过的关键设置，勿删。
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]

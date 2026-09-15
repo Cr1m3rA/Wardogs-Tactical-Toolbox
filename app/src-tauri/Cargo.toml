@@ -1,0 +1,25 @@
+[package]
+name = "wardogs-toolbox"
+version = "1.0.0"
+description = "WARDOGS 战术工具箱"
+edition = "2021"
+rust-version = "1.77"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+# tray-icon 提供托盘；default_window_icon() 需要 png 解码
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
+tauri-plugin-global-shortcut = "2"     # Alt+X 全局开关悬浮窗
+tauri-plugin-single-instance = "2"     # 二次启动只唤起已有窗口（否则托盘/热键会打架）
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# 瓦片抓取用同步 HTTP，跑在线程池里。tls = rustls（纯 Rust，交叉编译 MSVC 不必碰 openssl）
+ureq = { version = "2", default-features = false, features = ["tls", "gzip"] }
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true

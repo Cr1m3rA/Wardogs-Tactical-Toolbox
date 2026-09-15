@@ -1,0 +1,9 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "主窗与悬浮窗的最小权限集。core:default 已含 core:event（渲染层订阅 dl-progress 下载进度要用）。应用自己的 #[tauri::command] 不受 ACL 管辖，无需在此声明。",
+  "windows": ["main", "overlay"],
+  "permissions": [
+    "core:default"
+  ]
+}
