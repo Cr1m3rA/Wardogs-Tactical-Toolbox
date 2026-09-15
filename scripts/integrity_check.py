@@ -1,8 +1,13 @@
 # -*- coding: utf-8 -*-
-"""全量瓦片完整性校验：数量、魔数、残缺清单。"""
-import os, json
+"""全量瓦片完整性校验：数量、魔数、残缺清单。
 
-ROOT = r"D:\WardogsArtillery\tiles"
+用法：  python scripts/integrity_check.py [瓦片目录]
+不传目录时默认取仓库根下的 tiles\\，所以 clone 到哪儿都能直接用。
+"""
+import os, sys, json
+
+_HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(_HERE), "tiles")
 MAPS = ["bakurani", "ozeti", "zestafona"]
 
 def webp_ok(p):

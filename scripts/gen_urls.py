@@ -8,7 +8,7 @@
   README-下载说明.txt
 
 用法:
-  python gen_urls.py [--out D:/WardogsArtillery/tiles] [--maps bakurani,ozeti,zestafona]
+  python gen_urls.py [--out <仓库>/tiles] [--maps bakurani,ozeti,zestafona]
                      [--zooms 0-7] [--skip-existing]
 """
 import argparse, os
