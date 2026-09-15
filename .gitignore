@@ -1,0 +1,16 @@
+# 游戏素材绝不入库（本地瓦片约 1.79GB，且属于游戏资产）
+tiles/
+tile-conf/
+ref/
+
+# Node / 打包产物
+node_modules/
+dist/
+app/dist/
+
+# renderer/vendor 由 postinstall 从 node_modules 重建，不入库
+app/renderer/vendor/
+
+# 杂项
+*.log
+.DS_Store

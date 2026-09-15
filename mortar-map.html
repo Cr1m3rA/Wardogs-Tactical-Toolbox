@@ -1,0 +1,1788 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>WARDOGS · L81 迫击炮地图版计算器</title>
+<style>
+  :root{
+    --bg:#f4f5f7; --panel:#fff; --line:#e2e5ea; --line-strong:#c8cdd6;
+    --ink:#1c2024; --ink-2:#5a6169; --ink-3:#8b929b;
+    --accent:#2f6f4f; --accent-soft:#e7f1eb;
+    --warn:#a8621a; --warn-soft:#fdf1e3;
+    --bad:#a3322c; --bad-soft:#fbeceb;
+    --ro-bg:#fafbfc; --paste-bg:#fafbfc; --input-bg:#fff;
+    --mono:ui-monospace,"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+  }
+  body.dark{
+    --bg:#121518; --panel:#1b2026; --line:#2a323a; --line-strong:#39434d;
+    --ink:#e8ecef; --ink-2:#a7b0b9; --ink-3:#78838d;
+    --accent:#4e9b74; --accent-soft:#1d2f26;
+    --warn:#c98a3d; --warn-soft:#2e2517;
+    --bad:#c9564f; --bad-soft:#331d1c;
+    --ro-bg:#20262d; --paste-bg:#20262d; --input-bg:#20262d;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);
+    font:14px/1.55 system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
+    -webkit-font-smoothing:antialiased}
+  .wrap{max-width:1320px;margin:0 auto;padding:22px 18px 48px}
+  header.top{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:4px}
+  h1{font-size:19px;margin:0}
+  h1 .tag{font:600 11px/1 var(--mono);color:var(--accent);background:var(--accent-soft);
+    padding:5px 7px;border-radius:5px;vertical-align:2px;margin-right:9px;letter-spacing:.6px}
+  .sub{color:var(--ink-3);font-size:12.5px}
+  main{display:grid;grid-template-columns:1.35fr .78fr;gap:16px;margin-top:16px;align-items:start}
+  @media (max-width:980px){main{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px}
+  .card>.hd{padding:10px 13px;border-bottom:1px solid var(--line);display:flex;
+    align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+  .card>.hd b{font-size:12.5px;letter-spacing:.4px;text-transform:uppercase;color:var(--ink-2)}
+  .mapbox{position:relative;height:640px;background:#dfe3e8;border-radius:0 0 10px 10px;overflow:hidden}
+  @media (max-width:980px){.mapbox{height:70vw;min-height:340px}}
+  canvas#map{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair}
+  .gr-hint{padding:8px 13px;border-top:1px solid var(--line);color:var(--ink-3);
+    font-size:11.5px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+  .gr-tools{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .tabs{display:flex;gap:4px;padding:10px 10px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .tab{appearance:none;border:1px solid transparent;background:transparent;color:var(--ink-2);
+    font:inherit;font-size:13px;padding:7px 11px;border-radius:7px 7px 0 0;cursor:pointer}
+  .tab:hover{background:var(--bg)}
+  .tab.on{background:var(--panel);border-color:var(--line);border-bottom-color:var(--panel);
+    color:var(--ink);font-weight:600;margin-bottom:-1px}
+  .pane{display:none;padding:13px}
+  .pane.on{display:block}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  .fld{flex:1 1 118px;min-width:0}
+  .fld label{display:block;font-size:11.5px;color:var(--ink-3);margin-bottom:4px}
+  input[type=text]{width:100%;padding:8px 9px;border:1px solid var(--line-strong);border-radius:7px;
+    font:15px/1.2 var(--mono);color:var(--ink);background:var(--input-bg)}
+  input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .paste{width:100%;padding:7px 9px;border:1px dashed var(--line-strong);border-radius:7px;
+    font:12.5px var(--mono);color:var(--ink-2);background:var(--paste-bg);margin-top:8px}
+  button.btn{appearance:none;font:inherit;font-size:12.5px;padding:7px 11px;border-radius:7px;
+    border:1px solid var(--line-strong);background:var(--panel);color:var(--ink-2);cursor:pointer}
+  button.btn:hover{border-color:var(--ink-3);color:var(--ink)}
+  button.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+  button.btn.pri:hover{background:#275c42;color:#fff}
+  button.btn.on{background:var(--accent-soft);border-color:var(--accent);color:#1d4d35;font-weight:600}
+  .pick{display:flex;gap:4px;background:var(--bg);padding:3px;border-radius:8px}
+  .pick button{appearance:none;border:0;background:transparent;font:inherit;font-size:12px;
+    padding:5px 10px;border-radius:6px;cursor:pointer;color:var(--ink-2)}
+  .pick button.on{background:#fff;color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.07)}
+  .readout{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:13px}
+  .ro{background:var(--ro-bg);border:1px solid var(--line);border-radius:9px;padding:10px 11px}
+  .ro .k{font-size:11px;color:var(--ink-3)}
+  .ro .v{font:600 25px/1.15 var(--mono);margin-top:3px;letter-spacing:-.4px}
+  .ro .v small{font-size:13px;font-weight:500;color:var(--ink-3);margin-left:3px}
+  .ro.big{grid-column:1/-1;background:var(--accent-soft);border-color:#cfe3d7}
+  .ro.big .v{color:#1d4d35;font-size:32px}
+  .status{margin-top:11px;padding:9px 11px;border-radius:8px;font-size:12.5px;line-height:1.5}
+  .status.ok{background:var(--accent-soft);color:#1d4d35}
+  .status.warn{background:var(--warn-soft);color:#7c4712}
+  .status.bad{background:var(--bad-soft);color:#8a2721}
+  .cmd{margin-top:13px;background:#22282c;color:#e9edf0;border-radius:9px;padding:11px 12px;
+    font:13.5px/1.5 var(--mono);white-space:pre-wrap;word-break:break-word}
+  .cmd .lb{display:block;font:600 10.5px/1 var(--mono);letter-spacing:1px;color:#8fa0a8;margin-bottom:7px}
+  .kv{margin-top:11px;font-size:12.5px}
+  .kv div{display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-bottom:1px dashed var(--line)}
+  .kv div:last-child{border-bottom:0}
+  .kv span:last-child{font-family:var(--mono)}
+  .kv span:first-child{color:var(--ink-3)}
+  .muted{color:var(--ink-3);font-size:12.5px}
+  .notes{margin-top:16px;font-size:12.5px;color:var(--ink-2);line-height:1.65}
+  .notes b{color:var(--ink)}
+  .notes ol{margin:8px 0 0;padding-left:20px}
+  .notes li{margin:3px 0}
+  code{font:12.5px var(--mono);background:#eef0f3;padding:1.5px 5px;border-radius:4px}
+  .foot{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);
+    font-size:12px;color:var(--ink-3);line-height:1.6}
+  .foot a{color:var(--accent)}
+  .legend{display:flex;gap:12px;flex-wrap:wrap;font-size:11.5px;color:var(--ink-2)}
+  .legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:-1px}
+
+  /* ---------- v2 工具箱组件 ---------- */
+  .toolgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px}
+  .toolgrid button{appearance:none;font:inherit;font-size:12px;padding:9px 4px;border-radius:8px;
+    border:1px solid var(--line-strong);background:var(--ro-bg);color:var(--ink-2);cursor:pointer}
+  .toolgrid button.on{background:var(--accent-soft);border-color:var(--accent);color:#1d4d35;font-weight:600}
+  body.dark .toolgrid button.on{color:#9ed4b6}
+  .list{margin-top:10px;border:1px solid var(--line);border-radius:8px;overflow:hidden;max-height:290px;overflow-y:auto}
+  .list .li{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--line);
+    font-size:12.5px;background:var(--panel)}
+  .list .li:last-child{border-bottom:0}
+  .list .li:hover{background:var(--ro-bg)}
+  .list .li .nm{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:42%}
+  .list .li .co{font:11.5px var(--mono);color:var(--ink-3);white-space:nowrap}
+  .list .li .sp{flex:1}
+  .list .li .btn{padding:4px 8px;font-size:11.5px}
+  .badge{font:600 10.5px/1 var(--mono);padding:4px 6px;border-radius:5px;white-space:nowrap}
+  .badge.ok{background:var(--accent-soft);color:#1d4d35}
+  body.dark .badge.ok{color:#9ed4b6}
+  .badge.bad{background:var(--bad-soft);color:#8a2721}
+  body.dark .badge.bad{color:#e2938e}
+  .tbl{width:100%;border-collapse:collapse;font:12.5px var(--mono)}
+  .tbl th{font:600 11px system-ui;color:var(--ink-3);text-align:left;padding:6px 8px;
+    border-bottom:1px solid var(--line-strong);position:sticky;top:0;background:var(--panel)}
+  .tbl td{padding:5.5px 8px;border-bottom:1px solid var(--line);color:var(--ink-2)}
+  .tbl td:first-child{color:var(--ink);font-weight:600}
+  .tbl tr.cur td{background:var(--accent-soft);color:#1d4d35;font-weight:600}
+  body.dark .tbl tr.cur td{color:#9ed4b6}
+  .tblwrap{margin-top:10px;border:1px solid var(--line);border-radius:8px;max-height:430px;overflow:auto}
+  .mtx td,.mtx th{text-align:center}
+  .mtx td:first-child,.mtx th:first-child{text-align:left}
+  .mtx .best{outline:2px solid var(--accent);outline-offset:-2px;border-radius:4px}
+  .segrow{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+  .segrow label{font-size:11.5px;color:var(--ink-3)}
+  textarea.io{width:100%;min-height:120px;padding:9px;border:1px solid var(--line-strong);border-radius:7px;
+    font:11.5px/1.5 var(--mono);color:var(--ink);background:var(--input-bg);resize:vertical}
+  h3.sec{font-size:12.5px;letter-spacing:.4px;text-transform:uppercase;color:var(--ink-2);
+    margin:16px 0 8px;display:flex;align-items:center;gap:8px}
+  h3.sec:first-child{margin-top:0}
+  h3.sec::after{content:'';flex:1;height:1px;background:var(--line)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1><span class="tag">WARDOGS</span>战术工具箱</h1>
+    <span class="sub">迫击炮诸元 · 测距标绘 · 情报速查 · 射表 —— 全离线，1 格 = 100 m</span>
+  </header>
+
+  <main>
+    <!-- ================= 地图 ================= -->
+    <section class="card">
+      <div class="hd">
+        <b>战术地图</b>
+        <div class="gr-tools" id="mapBar">
+          <span id="mapBtns"></span>
+          <button class="btn" id="btnGrid" type="button">网格</button>
+          <button class="btn" id="btnPoi" type="button">地标</button>
+          <button class="btn" id="btnMarks" type="button" title="显示/隐藏自定义标记">标记</button>
+          <button class="btn" id="btnFit" type="button">整图</button>
+          <button class="btn" id="btnShot" type="button" title="把当前地图画面导出为 PNG">截图</button>
+          <button class="btn" id="btnSrc" type="button" title="底图来源">底图 自动</button>
+        </div>
+      </div>
+      <div class="mapbox"><canvas id="map"></canvas></div>
+      <div class="gr-hint">
+        <span id="hintText">点击地图放置点位 · 滚轮缩放 · 按住拖动 · 可拖动已放好的标记</span>
+        <span id="cursorCoord">X — / Y —</span>
+      </div>
+      <div class="gr-hint" style="border-top:0;padding-top:4px">
+        <span id="tileStat">底图 检测中…</span>
+        <span id="tileHint" style="opacity:.7">本地瓦片目录 tiles/</span>
+      </div>
+      <div class="gr-hint" style="border-top:0;padding-top:0">
+        <div class="legend">
+          <span><i style="background:#2f6f4f"></i>炮位</span>
+          <span><i style="background:#a3322c"></i>目标</span>
+          <span><i style="background:#a8621a"></i>弹坑</span>
+          <span><i style="background:#2a5f9e"></i>落点</span>
+          <span><i style="background:none;border:1.5px dashed #2f6f4f"></i>684 m</span>
+          <span><i style="background:none;border:1.5px dashed #a3322c"></i>132 m</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= 面板 ================= -->
+    <section class="card">
+      <div class="tabs">
+        <button class="tab on" data-mode="solve" type="button">算诸元</button>
+        <button class="tab" data-mode="predict" type="button">推落点</button>
+        <button class="tab" data-mode="correct" type="button">修偏差</button>
+        <button class="tab" data-mode="tools" type="button">工具</button>
+        <button class="tab" data-mode="intel" type="button">情报</button>
+        <button class="tab" data-mode="build" type="button">建造</button>
+        <button class="tab" data-mode="table" type="button">射表</button>
+        <button class="tab" data-mode="settings" type="button">设置</button>
+      </div>
+
+      <div class="pane on" id="pane-solve">
+        <div class="pick" id="pick-solve" style="margin-bottom:11px">
+          <button class="on" data-put="mortar" type="button">放炮位</button>
+          <button data-put="target" type="button">放目标</button>
+        </div>
+        <div class="row">
+          <div class="fld"><label>炮位 X</label><input type="text" id="mx" inputmode="decimal"></div>
+          <div class="fld"><label>炮位 Y</label><input type="text" id="my" inputmode="decimal"></div>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <div class="fld"><label>目标 X</label><input type="text" id="tx" inputmode="decimal"></div>
+          <div class="fld"><label>目标 Y</label><input type="text" id="ty" inputmode="decimal"></div>
+        </div>
+        <input class="paste" type="text" id="pIns" placeholder="粘贴 Mark Coordinates：x83.64, y72.85">
+        <button class="btn pri" id="btnSolve" type="button" style="width:100%;margin-top:10px">计算射击诸元</button>
+        <div id="out-solve"></div>
+      </div>
+
+      <div class="pane" id="pane-predict">
+        <p class="muted" style="margin:0 0 11px">炮位 + 方位角 + 密位（或 RNG）→ 炮弹落点坐标。也可以直接在地图上点一下。</p>
+        <div class="row">
+          <div class="fld"><label>炮位 X</label><input type="text" id="pmx" inputmode="decimal"></div>
+          <div class="fld"><label>炮位 Y</label><input type="text" id="pmy" inputmode="decimal"></div>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <div class="fld"><label>方位角 (° · 0=北 90=东)</label><input type="text" id="paz" inputmode="decimal"></div>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <div class="fld"><label>密位 MIL</label><input type="text" id="pmil" inputmode="decimal"></div>
+          <div class="fld"><label>或 RNG 距离 (m)</label><input type="text" id="prng" inputmode="decimal"></div>
+        </div>
+        <input class="paste" type="text" id="pIns2" placeholder="粘贴炮位坐标：x83.64, y72.85">
+        <button class="btn pri" id="btnPredict" type="button" style="width:100%;margin-top:10px">推算落点坐标</button>
+        <div id="out-predict"></div>
+      </div>
+
+      <div class="pane" id="pane-correct">
+        <p class="muted" style="margin:0 0 11px">试射后把弹坑坐标填进来，得到加/减多少米、左/右多少度。</p>
+        <div class="pick" id="pick-correct" style="margin-bottom:11px">
+          <button class="on" data-put="mortar" type="button">炮位</button>
+          <button data-put="target" type="button">目标</button>
+          <button data-put="impact" type="button">弹坑</button>
+        </div>
+        <div class="row">
+          <div class="fld"><label>炮位 X</label><input type="text" id="cmx" inputmode="decimal"></div>
+          <div class="fld"><label>炮位 Y</label><input type="text" id="cmy" inputmode="decimal"></div>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <div class="fld"><label>目标 X</label><input type="text" id="ctx" inputmode="decimal"></div>
+          <div class="fld"><label>目标 Y</label><input type="text" id="cty" inputmode="decimal"></div>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <div class="fld"><label>弹坑 X</label><input type="text" id="cix" inputmode="decimal"></div>
+          <div class="fld"><label>弹坑 Y</label><input type="text" id="ciy" inputmode="decimal"></div>
+        </div>
+        <button class="btn pri" id="btnCorrect" type="button" style="width:100%;margin-top:10px">计算修正量</button>
+        <div id="out-correct"></div>
+      </div>
+
+      <!-- ================= 工具 ================= -->
+      <div class="pane" id="pane-tools">
+        <div class="toolgrid" id="toolGrid">
+          <button data-tool="ruler" class="on" type="button">📏 测距</button>
+          <button data-tool="circle" type="button">⭕ 半径圈</button>
+          <button data-tool="ray" type="button">🧭 方位线</button>
+          <button data-tool="marker" type="button">📍 标记</button>
+          <button data-tool="route" type="button">🚶 路线</button>
+          <button data-tool="poly" type="button">⬟ 区域</button>
+        </div>
+        <div id="out-tool"></div>
+      </div>
+
+      <!-- ================= 情报 ================= -->
+      <div class="pane" id="pane-intel">
+        <h3 class="sec">炮位推荐 —— 谁能打到当前目标</h3>
+        <p class="muted" style="margin:0 0 8px">把你的自定义标记和地标当作候选炮位，按到目标的距离排序。L81 有效射程 <b>132–684 m</b>。</p>
+        <div class="list" id="listCand" style="max-height:240px"></div>
+        <h3 class="sec">出生点决策 —— 到各塔楼距离</h3>
+        <p class="muted" style="margin:0 0 8px">三个出生点（Valkyra / Manticore / Lonestar）到每座塔楼的直线距离，圈出来的是最优出生点。</p>
+        <div class="tblwrap" style="max-height:240px"><div id="mtxSpawn"></div></div>
+        <h3 class="sec">打击范围分析（以当前炮位为圆心）</h3>
+        <p class="muted" style="margin:0 0 8px">全部地标 + 自定义标记按距离排序。L81 有效射程 <b>132–684 m</b>，圈外就是打不着。</p>
+        <div class="list" id="listRange" style="max-height:300px"></div>
+        <h3 class="sec">地标速查</h3>
+        <div class="segrow"><label>筛选</label>
+          <button class="btn on" data-pf="all" type="button">全部</button>
+          <button class="btn" data-pf="tower" type="button">塔楼</button>
+          <button class="btn" data-pf="spawn" type="button">出生点</button>
+          <button class="btn" data-pf="vendor" type="button">商人/其他</button>
+        </div>
+        <div class="list" id="listPoi" style="max-height:320px"></div>
+      </div>
+
+      <!-- ================= 建造 ================= -->
+      <div class="pane" id="pane-build">
+        <h3 class="sec">材料计算器</h3>
+        <div class="segrow">
+          <label>模板</label>
+          <button class="btn" data-bp="aa" type="button">便携防空塔</button>
+          <button class="btn" data-bp="mortarpit" type="button">迫击炮阵地</button>
+          <button class="btn" data-bp="drill" type="button">钻井拉HotZone</button>
+          <button class="btn" data-bp="field" type="button">野战工事(免FOB)</button>
+          <button class="btn" id="btnCalcClr" type="button">清零</button>
+        </div>
+        <div class="readout" style="margin-top:4px">
+          <div class="ro big"><div class="k">建材合计</div><div class="v"><span id="calcTotal">0</span><small>单位</small></div></div>
+          <div class="ro"><div class="k">托盘数（1800/托）</div><div class="v" id="calcPallet">0</div></div>
+          <div class="ro"><div class="k">估算花费（建材 $10/单位 + 采购）</div><div class="v" id="calcCost">$0</div></div>
+          <div class="ro"><div class="k">总重量（约）</div><div class="v" id="calcWeight">0<small>kg</small></div></div>
+        </div>
+        <div class="tblwrap" style="max-height:330px"><table class="tbl"><thead><tr>
+          <th>建筑</th><th>建材</th><th>锤子</th><th>数量</th>
+        </tr></thead><tbody id="calcBody"></tbody></table></div>
+        <p class="muted" style="margin-top:8px">建材消耗为社区数据（不同版本可能微调）；建材 $10/单位，托盘 1800 单位/托（需 Z20 直升机或运输卡车搬运）。Medium 锤需支援 3 级 + $25,000 解锁，Large 锤需支援 8 级 + $75,000 解锁。迫击炮位切记：沙袋贴身围一圈、HESCO 隔一格，给炮弹留出射弧。</p>
+        <h3 class="sec">地图规划器</h3>
+        <div class="segrow">
+          <select id="buildSel" style="flex:1 1 200px;padding:8px;border:1px solid var(--line-strong);border-radius:7px;background:var(--input-bg);color:var(--ink);font:inherit"></select>
+          <button class="btn pri" id="btnBuildArm" type="button">⬇ 放到地图上</button>
+        </div>
+        <p class="muted" style="margin:8px 0 0">FOB 半径 60 m（蓝色圈，游戏内显示为蓝色方块）。需要 FOB 的建筑放在圈外会标红提示。</p>
+        <div class="list" id="listBuilds" style="max-height:200px"></div>
+      </div>
+
+      <!-- ================= 射表 ================= -->
+      <div class="pane" id="pane-table">
+        <p class="muted" style="margin:0 0 10px">L81 完整射表（社区测量，84 档）。算诸元时对应的档位会自动高亮。</p>
+        <div class="segrow">
+          <input type="text" id="tblQ" placeholder="输入距离(m)或密位反查，如 300 或 690" style="flex:1 1 200px">
+          <button class="btn" id="btnTblClr" type="button">清除</button>
+        </div>
+        <div class="tblwrap"><table class="tbl"><thead><tr>
+          <th>距离 m</th><th>密位 MIL</th><th>档间变化</th>
+        </tr></thead><tbody id="tblBody"></tbody></table></div>
+      </div>
+
+      <!-- ================= 设置 ================= -->
+      <div class="pane" id="pane-settings">
+        <h3 class="sec">外观</h3>
+        <div class="segrow">
+          <button class="btn" id="btnTheme" type="button">🌙 夜间模式</button>
+          <button class="btn" id="btnShowMarks" type="button">自定义标记：开</button>
+        </div>
+        <h3 class="sec">数据备份</h3>
+        <p class="muted" style="margin:0 0 8px">自定义标记、半径圈、方位线、战斗记录都保存在本机浏览器里。换电脑或清缓存前先导出。</p>
+        <div class="segrow">
+          <button class="btn pri" id="btnExport" type="button">导出 JSON</button>
+          <button class="btn" id="btnImport" type="button">导入 JSON</button>
+          <button class="btn" id="btnWipe" type="button">清空全部数据</button>
+        </div>
+        <textarea class="io" id="ioBox" placeholder="点「导出 JSON」后内容会出现在这里；导入时把 JSON 粘贴进来再点「导入 JSON」"></textarea>
+        <h3 class="sec">战斗记录</h3>
+        <div class="list" id="listHist" style="max-height:250px"></div>
+        <button class="btn" id="btnHistClr" type="button" style="width:100%;margin-top:8px">清空战斗记录</button>
+      </div>
+    </section>
+  </main>
+
+  <div class="notes card"><div class="bd">
+    <b>怎么用（游戏内操作）</b>
+    <ol>
+      <li>左边这张地图和游戏里的战术地图共用同一套坐标（1.00 = 100 m），所以你可以直接在图上点，也可以在游戏里 <b>右键 → Mark Coordinates</b> 复制坐标粘进来，两种混着用都行。</li>
+      <li>图上的塔楼（Tower）和三个出生点（Valkyra / Manticore / Lonestar）是社区标定的地标，用来对方向。</li>
+      <li>算完后：<b>方位角</b> = 炮口罗盘方位（0°=北，90°=东）；<b>RNG</b> = 左边距离滑杆；<b>密位 MIL</b> = 右边仰角。</li>
+      <li>转到位、拨到位，先打一发试射，再用"修偏差"把弹坑喂回来。</li>
+    </ol>
+    <div class="sep" style="height:1px;background:var(--line);margin:13px 0"></div>
+    <b>地图说明</b>：三张图（Bakurani / Ozeti / Zestafona）的底图瓦片已整份下载到本页同级的 <code>tiles/</code> 目录
+    （z0–z7 全级，约 6.5 万张 / 1.6 GB），所以现在<b>完全离线可用</b>。
+    右上「底图」按钮可在 自动 / 本地 / 在线 之间切换：自动 = 本地优先、缺失才回退社区 CDN。
+    Bakurani 是经过实测标定的；Ozeti 的坐标读数尚未与游戏内完全核对（约 162 m 的偏移待确认）；Zestafona 的坐标标定未经实测。
+    直接用 <code>file://</code> 双击打开时，部分浏览器会拦截本地图片；建议用 <code>scripts/serve.cmd</code> 起一个本地服务再访问。
+  </div></div>
+
+  <div class="foot">
+    射表与地图标定取自开源项目
+    <a href="https://github.com/apollyon-sys/wardogs-calculator" target="_blank" rel="noopener">apollyon-sys/wardogs-calculator</a>
+    （代码 MIT 许可；底图影像属于 WARDOGS 游戏资产，非 MIT，仅供个人参考使用）。
+    这是社区测量值，不是 Bulkhead 官方数据。计算假设炮位与目标等高，不处理地形起伏、建筑遮挡、风向与车辆倾斜；
+    L81 自带 50 MOA 散布（685 m 处约 ±10 m），第一发永远是试射弹。
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   L81 迫击炮射表（社区测量, [距离m, 密位]）
+   数据源: apollyon-sys/wardogs-calculator · MIT
+   ============================================================ */
+const TBL = [
+  [80,950],[87,940],[93,930],[99,920],[105,910],[110,900],[115,890],[118,880],[122,870],[127,860],
+  [132,850],[140,840],[151,830],[163,820],[175,810],[187,800],[198,790],[208,780],[219,770],[229,760],
+  [239,750],[250,740],[260,730],[270,720],[280,710],[290,700],[300,690],[310,680],[319,670],[329,660],
+  [339,650],[348,640],[358,630],[367,620],[376,610],[385,600],[394,590],[403,580],[412,570],[420,560],
+  [429,550],[437,540],[446,530],[454,520],[462,510],[470,500],[478,490],[486,480],[494,470],[501,460],
+  [509,450],[516,440],[524,430],[531,420],[538,410],[545,400],[552,390],[559,380],[565,370],[572,360],
+  [578,350],[585,340],[591,330],[597,320],[603,310],[609,300],[615,290],[620,280],[626,270],[631,260],
+  [636,250],[641,240],[646,230],[651,220],[656,210],[661,200],[666,190],[670,180],[675,170],[680,160],
+  [684,150],[688,140],[693,130],[697,120]
+];
+const MIN_R = 132, MAX_R = 684;
+const MOA50 = Math.tan(50/60 * Math.PI/180);
+const MAPS={"bakurani": {"id": "bakurani","name": "Bakurani","bounds": {"minX": 23.35,"maxX": 133.6,"minY": 19.34,"maxY": 129.65},"tiles": {"path": "https://assets.wardogs-artillery.com/releases/assets-v1/maps/tiles/bakurani","tileSize": 256,"minZoom": 0,"maxZoom": 7,"extension": "webp"},"markers": [{"x": 83.64,"y": 72.85,"label": "Tower 4","icon": "tower","minZoom": 0.4},{"x": 77.19,"y": 73.44,"label": "Tower 3","icon": "tower","minZoom": 0.4},{"x": 77.19,"y": 70.0,"label": "Tower 2","icon": "tower","minZoom": 0.4},{"x": 80.52,"y": 69.85,"label": "Tower 1","icon": "tower","minZoom": 0.4},{"x": 82.22,"y": 68.41,"label": "Tower 5","icon": "tower","minZoom": 0.4},{"x": 118.75,"y": 70.93,"label": "Valkyra","icon": "valkyra","minZoom": 10},{"x": 118.3,"y": 70.73,"label": "Weapons Vendor","icon": "weapons_vendor","minZoom": 10},{"x": 118.14,"y": 70.45,"label": "Garage Vendor","icon": "garage_vendor","minZoom": 10},{"x": 118.37,"y": 70.49,"label": "Spawn Board","icon": "spawn_board","minZoom": 10},{"x": 40.09,"y": 77.52,"label": "Manticore","icon": "manticore","minZoom": 10},{"x": 39.77,"y": 77.65,"label": "Weapons Vendor","icon": "weapons_vendor","minZoom": 10},{"x": 40.1,"y": 77.31,"label": "Garage Vendor","icon": "garage_vendor","minZoom": 10},{"x": 39.68,"y": 77.48,"label": "Spawn Board","icon": "spawn_board","minZoom": 10},{"x": 87.46,"y": 32.5,"label": "Lonestar","icon": "lonestar","minZoom": 10},{"x": 87.2,"y": 32.68,"label": "Weapons Vendor","icon": "weapons_vendor","minZoom": 10},{"x": 86.84,"y": 32.64,"label": "Garage Vendor","icon": "garage_vendor","minZoom": 10},{"x": 87.06,"y": 32.72,"label": "Spawn Board","icon": "spawn_board","minZoom": 10}]},"ozeti": {"id": "ozeti","name": "Ozeti","bounds": {"minX": 57.58,"maxX": 143.07,"minY": 21.81,"maxY": 99.56},"tiles": {"path": "https://assets.wardogs-artillery.com/releases/assets-v1/maps/tiles/ozeti","tileSize": 256,"minZoom": 0,"maxZoom": 7,"extension": "webp"},"markers": [{"x": 100.62,"y": 67.64,"label": "Tower 4","icon": "tower","minZoom": 0.4},{"x": 104.49,"y": 63.71,"label": "Tower 3","icon": "tower","minZoom": 0.4},{"x": 100.37,"y": 59.23,"label": "Tower 2","icon": "tower","minZoom": 0.4},{"x": 95.8,"y": 62.82,"label": "Tower 1","icon": "tower","minZoom": 0.4},{"x": 118.75,"y": 70.93,"label": "Valkyra","icon": "valkyra","minZoom": 10},{"x": 138.03,"y": 67.33,"label": "Weapons Vendor","icon": "weapons_vendor","minZoom": 10},{"x": 137.9,"y": 67.07,"label": "Garage Vendor","icon": "garage_vendor","minZoom": 10},{"x": 137.88,"y": 67.26,"label": "Spawn Board","icon": "spawn_board","minZoom": 10},{"x": 68.28,"y": 88.03,"label": "Manticore","icon": "manticore","minZoom": 10},{"x": 68.54,"y": 88.16,"label": "Weapons Vendor","icon": "weapons_vendor","minZoom": 10},{"x": 68.66,"y": 87.92,"label": "Garage Vendor","icon": "garage_vendor","minZoom": 10},{"x": 68.42,"y": 87.86,"label": "Spawn Board","icon": "spawn_board","minZoom": 10},{"x": 83.73,"y": 30.69,"label": "Lonestar","icon": "lonestar","minZoom": 10},{"x": 83.85,"y": 30.88,"label": "Weapons Vendor","icon": "weapons_vendor","minZoom": 10},{"x": 83.73,"y": 31.17,"label": "Garage Vendor","icon": "garage_vendor","minZoom": 10},{"x": 83.68,"y": 31.04,"label": "Spawn Board","icon": "spawn_board","minZoom": 10}]},"zestafona": {"id": "zestafona","name": "Zestafona","bounds": {"minX": 19.9,"maxX": 124.89,"minY": 50.7,"maxY": 141.9},"tiles": {"path": "https://assets.wardogs-artillery.com/releases/assets-v1/maps/tiles/zestafona","tileSize": 256,"minZoom": 0,"maxZoom": 7,"extension": "webp"},"markers": [{"x": 70.172672,"y": 100.1717,"label": "Tower 3","icon": "tower","minZoom": 0.4},{"x": 68.599808,"y": 104.15299999999999,"label": "Tower 1","icon": "tower","minZoom": 0.4},{"x": 72.892416,"y": 105.07059199999999,"label": "Tower 2","icon": "tower","minZoom": 0.4},{"x": 39.436288,"y": 124.94438399999999,"label": "VALKYRA Spawn","icon": "valkyra","minZoom": 10},{"x": 104.66099200000001,"y": 115.081216,"label": "MANTICORE Spawn","icon": "manticore","minZoom": 10},{"x": 68.009984,"y": 66.60096,"label": "LONESTAR","icon": "lonestar","minZoom": 10},{"x": 38.895616,"y": 124.862464,"label": "Spawn Board","icon": "spawn_board","minZoom": 10},{"x": 104.66099200000001,"y": 114.54054400000001,"label": "Garage Vendor","icon": "garage_vendor","minZoom": 10},{"x": 105.054208,"y": 115.294208,"label": "Spawn Board","icon": "spawn_board","minZoom": 10},{"x": 68.23935999999999,"y": 66.322432,"label": "Spawn Board","icon": "spawn_board","minZoom": 10},{"x": 67.82976,"y": 66.502656,"label": "Garage Vendor","icon": "garage_vendor","minZoom": 10},{"x": 39.40352,"y": 124.79692800000001,"label": "Garage Vendor","icon": "garage_vendor","minZoom": 10}]}};
+
+function rangeToMil(r){
+  const t = TBL;
+  if (r <= t[0][0]) return t[0][1];
+  if (r >= t[t.length-1][0]) return t[t.length-1][1];
+  for (let i=0;i<t.length-1;i++){
+    const [r1,m1]=t[i], [r2,m2]=t[i+1];
+    if (r <= r2) return m1 + (r-r1)*(m2-m1)/(r2-r1);
+  }
+  return t[t.length-1][1];
+}
+function milToRange(m){
+  const t = TBL;
+  if (m >= t[0][1]) return t[0][0];
+  if (m <= t[t.length-1][1]) return t[t.length-1][0];
+  for (let i=0;i<t.length-1;i++){
+    const [r1,m1]=t[i], [r2,m2]=t[i+1];
+    if (m >= m2) return r1 + (m-m1)*(r2-r1)/(m2-m1);
+  }
+  return t[t.length-1][0];
+}
+function solveVector(dx, dy){
+  const dist = 100 * Math.hypot(dx, dy);
+  let az = Math.atan2(dx, dy) * 180/Math.PI;
+  return { dist, az: (az + 360) % 360 };
+}
+function unitToXY(mx, my, azDeg, distM){
+  const r = distM/100, a = azDeg*Math.PI/180;
+  return { x: mx + r*Math.sin(a), y: my + r*Math.cos(a) };
+}
+const fx  = v => (v==null || Number.isNaN(v)) ? '—' : v.toFixed(2);
+const fm0 = v => (v==null || Number.isNaN(v)) ? '—' : Math.round(v).toString();
+const faz = v => (v==null || Number.isNaN(v)) ? '—' : String(Math.round(v)%360).padStart(3,'0') + '°';
+function parseNum(s){
+  const m = String(s==null?'':s).replace(/[，、]/g,',').match(/-?\d+(?:\.\d+)?/);
+  if (!m) return null;
+  const v = parseFloat(m[0]); return Number.isFinite(v) ? v : null;
+}
+function parsePair(s){
+  if (!s) return null;
+  const nums = String(s).replace(/[，、xXyY:：=]/g,' ').match(/-?\d+(?:\.\d+)?/g);
+  if (!nums || nums.length < 2) return null;
+  return { x: parseFloat(nums[0]), y: parseFloat(nums[1]) };
+}
+
+/* ============================================================
+   状态
+   ============================================================ */
+const S = {
+  mode:'solve', mapId:'bakurani',
+  mortar:null, target:null, impact:null, predPoint:null,
+  put:'mortar', showGrid:true, showPoi:true,
+  srcMode:'auto',                   // 底图来源: auto | local | cdn
+  view:{ cx:78, cy:74, scale:6 },   // scale = 屏幕像素 / 游戏坐标单位
+  lastAz:null,
+  /* v2 工具箱 */
+  tool:'ruler',                     // ruler | circle | ray | marker | route | poly
+  ruler:{ a:null, b:null },
+  circles:[],                       // {x,y,r,name}
+  rays:[],                          // {x,y,az,name}
+  marks:[],                         // {id,x,y,name,color}
+  route:{ pts:[] },                 // 多段路线（行军/巡逻）
+  polys:[],                         // {id,pts:[{x,y}],name,color,nofire}
+  polyDraft:null,                   // 正在画的区域 {pts:[]}
+  builds:[],                        // 建造规划点 {id,k,x,y}
+  calcQty:{},                       // 材料计算器 {k:qty}
+  buildArm:null,                    // 待放置的建造项 key
+  showMarks:true,
+  theme:'light',
+  hist:[],                          // {t,map,txt}
+  seq:1
+};
+const MARK_COLORS = ['#a3322c','#2a5f9e','#a8621a','#7a3f9d','#1c7a7a','#c2185b'];
+const RADIUS_PRESETS = [100,200,300,400,500,684];
+const $ = id => document.getElementById(id);
+
+/* ============================================================
+   画布与瓦片
+   ============================================================ */
+const canvas = $('map');
+const ctx = canvas.getContext('2d');
+let CW = 0, CH = 0, DPR = 1;
+const tileCache = new Map();       // key -> Image
+const TILE_MAX = 700;
+let tileFail = 0, tileOk = 0;
+
+/* ---------- 底图来源：本地优先，CDN 兜底 ----------
+   tiles/<mapId>/zoom_<z>/<x>_<y>.webp   ← 与本页同级的本地目录
+   probe[mapId]: 'pending' | 'local' | 'cdn'  自动模式下的探测结果
+--------------------------------------------------- */
+const TILE_ROOT = 'tiles';
+const SRC_KEY = 'wardogs-mortar-map-src';
+const SRC_SEQ = ['auto', 'local', 'cdn'];
+const SRC_TXT = { auto:'自动', local:'本地', cdn:'在线' };
+const probe = {};
+
+function tileUrl(m, tz, tx, ty, local){
+  const t = m.tiles;
+  return local
+    ? `${TILE_ROOT}/${m.id}/zoom_${tz}/${tx}_${ty}.${t.extension}`
+    : `${t.path}/zoom_${tz}/${tx}_${ty}.${t.extension}`;
+}
+function tileBase(m){
+  if (S.srcMode === 'local') return 'local';
+  if (S.srcMode === 'cdn')   return 'cdn';
+  return probe[m.id] || 'pending';
+}
+function probeLocal(m){
+  if (S.srcMode !== 'auto'){ probe[m.id] = S.srcMode === 'local' ? 'local' : 'cdn'; updateTileStat(); return; }
+  if (probe[m.id]) return;
+  probe[m.id] = 'pending';
+  // CDN 低层级偶有空洞（如 ozeti/zoom_0/0_0 是 404），逐个候选试，任一命中即认定本地可用
+  const cands = [[0,0,0],[1,0,0],[2,0,0]];
+  let i = 0;
+  const next = () => {
+    if (i >= cands.length){ probe[m.id] = 'cdn'; updateTileStat(); draw(); return; }
+    const [z,x,y] = cands[i++];
+    const im = new Image();
+    im.onload  = () => { probe[m.id] = 'local'; updateTileStat(); draw(); };
+    im.onerror = () => next();
+    im.src = tileUrl(m, z, x, y, true);
+  };
+  next();
+}
+function updateTileStat(){
+  const el = $('tileStat'); if (!el) return;
+  const p = probe[MAP().id];
+  const name = p === 'local' ? '本地离线' : p === 'cdn' ? '在线 CDN' : p === 'pending' ? '检测中…' : '待检测';
+  const forced = S.srcMode === 'auto' ? '（自动，本地优先）' : S.srcMode === 'local' ? '（强制本地）' : '（强制在线）';
+  el.textContent = '底图 ' + name + forced + (tileOk ? ' · 已渲染 ' + tileOk + ' 块' : '');
+}
+
+function mkTile(url, onfail){
+  let img = tileCache.get(url);
+  if (img) return img;
+  if (tileCache.size > TILE_MAX) tileCache.delete(tileCache.keys().next().value);
+  img = new Image();
+  img.decoding = 'async';
+  img.onload  = () => { tileOk++; updateTileStat(); draw(); };
+  img.onerror = () => { if (onfail) onfail(); else { tileFail++; } };
+  img.src = url;
+  tileCache.set(url, img);
+  return img;
+}
+function getTile(m, tz, tx, ty){
+  const base = tileBase(m);
+  if (base === 'pending') return null;
+  if (base === 'local'){
+    const lu = tileUrl(m, tz, tx, ty, true);
+    return mkTile(lu, () => {
+      // 单块本地缺失：只对这一块回退 CDN，不推翻整图来源判断
+      if (S.srcMode === 'cdn'){ tileFail++; return; }
+      mkTile(tileUrl(m, tz, tx, ty, false));
+    });
+  }
+  return mkTile(tileUrl(m, tz, tx, ty, false));
+}
+
+function resize(){
+  const r = canvas.getBoundingClientRect();
+  DPR = Math.min(2, window.devicePixelRatio || 1);
+  CW = Math.max(1, Math.round(r.width)); CH = Math.max(1, Math.round(r.height));
+  canvas.width = Math.round(CW*DPR); canvas.height = Math.round(CH*DPR);
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+}
+function MAP(){ return MAPS[S.mapId]; }
+function w2s(gx, gy){
+  return { x:(gx - S.view.cx)*S.view.scale + CW/2, y:(S.view.cy - gy)*S.view.scale + CH/2 };
+}
+function s2w(px, py){
+  return { x:(px - CW/2)/S.view.scale + S.view.cx, y:S.view.cy - (py - CH/2)/S.view.scale };
+}
+function fitMap(){
+  const b = MAP().bounds;
+  S.view.cx = (b.minX+b.maxX)/2; S.view.cy = (b.minY+b.maxY)/2;
+  S.view.scale = Math.min(CW/(b.maxX-b.minX), CH/(b.maxY-b.minY)) * 0.96;
+}
+function tileZoom(){
+  const b = MAP().bounds, t = MAP().tiles;
+  // ceil 保证每块瓦片在屏幕上不超过原生 256px（只缩不小，不发虚）
+  const want = Math.log2((b.maxX-b.minX)*S.view.scale / t.tileSize);
+  return Math.max(t.minZoom, Math.min(t.maxZoom, Math.ceil(want - 1e-6)));
+}
+function niceStep(span){
+  const raw = span/8, pow = Math.pow(10, Math.floor(Math.log10(raw)));
+  const n = raw/pow;
+  return (n<=1?1:n<=2?2:n<=5?5:10)*pow;
+}
+
+function draw(){
+  resizeIfNeeded();
+  ctx.clearRect(0,0,CW,CH);
+  ctx.fillStyle = '#dfe3e8'; ctx.fillRect(0,0,CW,CH);
+  drawTiles();
+  drawNoTileBadge();
+  if (S.showGrid) drawGrid();
+  if (S.showPoi) drawPoi();
+  drawToolsLayer();
+  drawBuildsLayer();
+  drawSolution();
+  updateTileStat();
+}
+function drawNoTileBadge(){
+  const p = probe[MAP().id];
+  if (tileOk > 0) return;
+  const txt = p === 'pending' ? '正在检测本地底图…'
+    : (S.srcMode === 'cdn' || p === 'cdn') && tileFail >= 3 ? '底图无法加载（离线？）· 网格与标点仍可用'
+    : tileFail >= 3 ? '底图缺失 · 网格与标点仍可用' : '底图加载中…';
+  ctx.font = '600 12px system-ui';
+  const w = ctx.measureText(txt).width + 20;
+  ctx.fillStyle = 'rgba(28,32,36,.78)';
+  ctx.fillRect((CW-w)/2, 12, w, 26);
+  ctx.fillStyle = '#fff';
+  ctx.fillText(txt, (CW-w)/2+10, 29);
+}
+
+let lastW = 0, lastH = 0;
+function resizeIfNeeded(){
+  const r = canvas.getBoundingClientRect();
+  if (Math.round(r.width) !== lastW || Math.round(r.height) !== lastH){
+    lastW = Math.round(r.width); lastH = Math.round(r.height);
+    resize();
+  }
+}
+window.addEventListener('resize', () => { lastW = 0; draw(); });
+
+function drawTiles(){
+  const m = MAP(), t = m.tiles, b = m.bounds;
+  probeLocal(m);
+  const tz = tileZoom();
+  const n = Math.pow(2, tz);
+  const tw = (b.maxX-b.minX)/n, th = (b.maxY-b.minY)/n;
+  const tl = w2s(b.minX, b.maxY);              // 瓦片 (0,0) 左上角
+  const px = tw*S.view.scale, py = th*S.view.scale;
+  if (px < 2 || py < 2) return;
+  const x0 = Math.max(0, Math.floor((0 - tl.x)/px)), x1 = Math.min(n-1, Math.floor((CW - tl.x)/px));
+  const y0 = Math.max(0, Math.floor((0 - tl.y)/py)), y1 = Math.min(n-1, Math.floor((CH - tl.y)/py));
+  ctx.imageSmoothingEnabled = true;
+  for (let ty=y0; ty<=y1; ty++){
+    for (let tx=x0; tx<=x1; tx++){
+      const img = getTile(m, tz, tx, ty);
+      const sx = tl.x + tx*px, sy = tl.y + ty*py;
+      if (img && img.complete && img.naturalWidth){
+        ctx.drawImage(img, sx, sy, px+0.6, py+0.6);
+      }
+    }
+  }
+}
+
+function drawGrid(){
+  const b = MAP().bounds;
+  const w0 = s2w(0,0), w1 = s2w(CW,CH);
+  const step = niceStep(Math.max(w1.x-w0.x, w1.y-w0.y));
+  ctx.lineWidth = 1;
+  ctx.font = '10.5px ui-monospace,Consolas,monospace';
+  const gx0 = Math.ceil(Math.max(b.minX,w0.x)/step)*step, gx1 = Math.min(b.maxX,w1.x);
+  for (let x=gx0; x<=gx1+1e-9; x+=step){
+    const p = w2s(x, 0);
+    ctx.strokeStyle = 'rgba(28,32,36,.13)';
+    ctx.beginPath(); ctx.moveTo(p.x,0); ctx.lineTo(p.x,CH); ctx.stroke();
+    ctx.fillStyle = 'rgba(28,32,36,.55)';
+    ctx.fillText(x.toFixed(step<1?1:0), p.x+3, CH-6);
+  }
+  const gy1 = Math.floor(Math.min(b.maxY,w1.y)/step)*step;
+  for (let y=gy1; y>=Math.max(b.minY,w0.y)-1e-9; y-=step){
+    const p = w2s(0, y);
+    ctx.strokeStyle = 'rgba(28,32,36,.13)';
+    ctx.beginPath(); ctx.moveTo(0,p.y); ctx.lineTo(CW,p.y); ctx.stroke();
+    ctx.fillStyle = 'rgba(28,32,36,.55)';
+    ctx.fillText(y.toFixed(step<1?1:0), 5, p.y-4);
+  }
+  // 比例尺
+  const targetPx = 110;
+  const rawM = targetPx / S.view.scale * 100;
+  const nice = [10,20,50,100,200,500,1000,2000].reduce((a,c)=>Math.abs(c-rawM)<Math.abs(a-rawM)?c:a,100);
+  const barPx = nice/100*S.view.scale;
+  ctx.strokeStyle = '#1c2024'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(14, CH-16); ctx.lineTo(14+barPx, CH-16); ctx.stroke();
+  ctx.fillStyle = '#1c2024'; ctx.font = '600 11px system-ui';
+  ctx.fillText(nice + ' m', 14, CH-22);
+}
+
+function drawPoi(){
+  const m = MAP();
+  const showAll = S.view.scale > 9;
+  ctx.font = '600 11px system-ui';
+  for (const mk of m.markers){
+    const isTower = mk.icon === 'tower';
+    if (!isTower && !showAll) continue;
+    const p = w2s(mk.x, mk.y);
+    if (p.x < -60 || p.x > CW+60 || p.y < -30 || p.y > CH+30) continue;
+    ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI*2);
+    ctx.fillStyle = isTower ? 'rgba(163,50,44,.9)' : 'rgba(42,63,94,.85)';
+    ctx.fill();
+    ctx.lineWidth = 1.5; ctx.strokeStyle = '#fff'; ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,.92)';
+    const tw = ctx.measureText(mk.label).width;
+    ctx.fillRect(p.x+6, p.y-13, tw+7, 15);
+    ctx.fillStyle = isTower ? '#a3322c' : '#2a3f5e';
+    ctx.fillText(mk.label, p.x+9.5, p.y-1.5);
+  }
+}
+
+function ring(gx, gy, rMeters, color){
+  const p = w2s(gx, gy), r = rMeters/100*S.view.scale;
+  if (r < 1) return;
+  ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI*2);
+  ctx.strokeStyle = color; ctx.lineWidth = 1.3; ctx.setLineDash([6,5]); ctx.stroke();
+  ctx.setLineDash([]);
+}
+function dot(gx, gy, color, label, sub){
+  const p = w2s(gx, gy);
+  ctx.beginPath(); ctx.arc(p.x, p.y, 6.5, 0, Math.PI*2);
+  ctx.fillStyle = '#fff'; ctx.fill();
+  ctx.lineWidth = 2.6; ctx.strokeStyle = color; ctx.stroke();
+  ctx.beginPath(); ctx.arc(p.x, p.y, 2.3, 0, Math.PI*2);
+  ctx.fillStyle = color; ctx.fill();
+  ctx.font = '600 11.5px system-ui'; ctx.fillStyle = color;
+  ctx.fillText(label, p.x+11, p.y-7);
+  ctx.font = '10.5px ui-monospace,Consolas,monospace'; ctx.fillStyle = '#5a6169';
+  ctx.fillText(sub, p.x+11, p.y+6);
+}
+function seg(a, b, color, dash){
+  const p1 = w2s(a.x,a.y), p2 = w2s(b.x,b.y);
+  ctx.beginPath(); ctx.moveTo(p1.x,p1.y); ctx.lineTo(p2.x,p2.y);
+  ctx.strokeStyle = color; ctx.lineWidth = 1.8; ctx.setLineDash(dash); ctx.stroke();
+  ctx.setLineDash([]);
+}
+/* ---------- v2 工具图层 ---------- */
+function polyCentroid(pts){
+  let x = 0, y = 0; for (const p of pts){ x += p.x; y += p.y; }
+  return { x:x/pts.length, y:y/pts.length };
+}
+function drawPolyPath(pts, close, color, fill){
+  ctx.beginPath();
+  pts.forEach((p, i) => { const s = w2s(p.x, p.y); i ? ctx.lineTo(s.x, s.y) : ctx.moveTo(s.x, s.y); });
+  if (close){
+    ctx.closePath();
+    if (fill){ ctx.fillStyle = fill; ctx.fill(); }
+  }
+  ctx.strokeStyle = color; ctx.lineWidth = 1.8;
+  ctx.setLineDash(close ? [] : [7,5]); ctx.stroke(); ctx.setLineDash([]);
+}
+function drawToolsLayer(){
+  // 多边形区域（含禁炸区）
+  for (const pg of S.polys){
+    const fill = pg.nofire ? 'rgba(163,50,44,.12)' : 'rgba(122,63,157,.10)';
+    drawPolyPath(pg.pts, true, pg.color, fill);
+    const c = polyCentroid(pg.pts), s = w2s(c.x, c.y);
+    ctx.font = '600 11px system-ui';
+    const txt = (pg.nofire ? '🚫' : '') + pg.name;
+    const tw = ctx.measureText(txt).width + 8;
+    ctx.fillStyle = 'rgba(255,255,255,.92)';
+    ctx.fillRect(s.x-tw/2, s.y-9, tw, 17);
+    ctx.fillStyle = pg.color; ctx.fillText(txt, s.x-tw/2+4, s.y+4);
+  }
+  if (S.mode === 'tools' && S.polyDraft && S.polyDraft.pts.length){
+    drawPolyPath(S.polyDraft.pts, false, 'rgba(163,50,44,.8)');
+    const f = S.polyDraft.pts[0], fp = w2s(f.x, f.y);
+    ctx.beginPath(); ctx.arc(fp.x, fp.y, 8, 0, Math.PI*2);
+    ctx.strokeStyle = 'rgba(163,50,44,.9)'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.font = '600 10.5px system-ui'; ctx.fillStyle = '#a3322c';
+    ctx.fillText(S.polyDraft.pts.length < 3 ? '再点 ' + (3 - S.polyDraft.pts.length) + ' 下后可闭合' : '点起点圆圈闭合', fp.x+12, fp.y+4);
+  }
+  // 多段路线
+  if (S.route.pts.length){
+    const pts = S.route.pts;
+    drawPolyPath(pts, false, '#c2185b');
+    ctx.font = '600 10.5px ui-monospace,Consolas,monospace';
+    let total = 0;
+    for (let i = 1; i < pts.length; i++){
+      const d = Math.hypot(pts[i].x-pts[i-1].x, pts[i].y-pts[i-1].y) * 100;
+      total += d;
+      const m = w2s((pts[i].x+pts[i-1].x)/2, (pts[i].y+pts[i-1].y)/2);
+      const txt = Math.round(d) + 'm';
+      const tw = ctx.measureText(txt).width + 8;
+      ctx.fillStyle = 'rgba(255,255,255,.92)'; ctx.fillRect(m.x-tw/2, m.y-9, tw, 15);
+      ctx.fillStyle = '#c2185b'; ctx.fillText(txt, m.x-tw/2+4, m.y+3);
+    }
+    pts.forEach(p => { const s = w2s(p.x, p.y);
+      ctx.beginPath(); ctx.arc(s.x, s.y, 3.5, 0, Math.PI*2);
+      ctx.fillStyle = '#c2185b'; ctx.fill();
+      ctx.lineWidth = 1.5; ctx.strokeStyle = '#fff'; ctx.stroke(); });
+    if (pts.length > 1){
+      const lp = w2s(pts[pts.length-1].x, pts[pts.length-1].y);
+      ctx.font = '600 11px system-ui';
+      const txt = '全程 ' + Math.round(total) + ' m';
+      const tw = ctx.measureText(txt).width + 10;
+      ctx.fillStyle = 'rgba(194,24,91,.95)'; ctx.fillRect(lp.x+7, lp.y-10, tw, 19);
+      ctx.fillStyle = '#fff'; ctx.fillText(txt, lp.x+12, lp.y+4);
+    }
+  }
+  // 半径圈
+  for (const c of S.circles){
+    const p = w2s(c.x, c.y), r = c.r/100*S.view.scale;
+    if (r < 1 || p.x < -r-80 || p.x > CW+r+80 || p.y < -r-40 || p.y > CH+r+40) continue;
+    ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI*2);
+    ctx.strokeStyle = 'rgba(122,63,157,.85)'; ctx.lineWidth = 1.6;
+    ctx.setLineDash([2,4]); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(122,63,157,.06)'; ctx.fill();
+    ctx.font = '600 10.5px system-ui'; ctx.fillStyle = '#7a3f9d';
+    ctx.fillText(c.name + ' · ' + Math.round(c.r) + ' m', p.x + 6, p.y - r - 5);
+  }
+  // 方位线
+  for (const ry of S.rays){
+    const p = w2s(ry.x, ry.y);
+    const a = ry.az * Math.PI/180;
+    const L = Math.hypot(CW, CH) * 1.2;
+    ctx.beginPath(); ctx.moveTo(p.x, p.y);
+    ctx.lineTo(p.x + Math.sin(a)*L, p.y - Math.cos(a)*L);
+    ctx.strokeStyle = 'rgba(28,122,122,.75)'; ctx.lineWidth = 1.5;
+    ctx.setLineDash([9,6]); ctx.stroke(); ctx.setLineDash([]);
+    ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI*2);
+    ctx.fillStyle = '#1c7a7a'; ctx.fill();
+    ctx.font = '600 10.5px system-ui'; ctx.fillStyle = '#1c7a7a';
+    ctx.fillText(ry.name + ' · ' + ry.az.toFixed(0) + '°', p.x + 7, p.y - 7);
+  }
+  // 自定义标记
+  if (S.showMarks){
+    for (const mk of S.marks){
+      const p = w2s(mk.x, mk.y);
+      if (p.x < -70 || p.x > CW+70 || p.y < -40 || p.y > CH+40) continue;
+      ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, Math.PI*2);
+      ctx.fillStyle = mk.color; ctx.fill();
+      ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke();
+      ctx.font = '600 11px system-ui';
+      const tw = ctx.measureText(mk.name).width + 8;
+      ctx.fillStyle = 'rgba(255,255,255,.94)';
+      ctx.fillRect(p.x+7, p.y-14, tw, 16);
+      ctx.fillStyle = mk.color;
+      ctx.fillText(mk.name, p.x+11, p.y-2);
+    }
+  }
+  // 测距尺（仅工具模式）
+  if (S.mode === 'tools' && S.tool === 'ruler'){
+    const {a, b} = S.ruler;
+    if (a && b){
+      seg(a, b, '#c2185b', [2,3]);
+      const {dist, az} = solveVector(b.x-a.x, b.y-a.y);
+      const mid = w2s((a.x+b.x)/2, (a.y+b.y)/2);
+      const txt = Math.round(dist)+' m / '+faz(az)+'°';
+      ctx.font = '600 11.5px ui-monospace,Consolas,monospace';
+      const w = ctx.measureText(txt).width + 14;
+      ctx.fillStyle = 'rgba(194,24,91,.92)';
+      ctx.beginPath();
+      const bx = mid.x-w/2, by = mid.y-11;
+      if (ctx.roundRect){ ctx.roundRect(bx,by,w,22,5); ctx.fill(); } else ctx.fillRect(bx,by,w,22);
+      ctx.fillStyle = '#fff'; ctx.fillText(txt, bx+7, by+15);
+    }
+    if (a && !b) dot(a.x, a.y, '#c2185b', '起点', '再点一下结束');
+  }
+  if (S.mode === 'tools' && S.pend) dot(S.pend.p.x, S.pend.p.y,
+    S.pend.kind === 'ray' ? '#1c7a7a' : '#7a3f9d', '已选', '再点一下确定');
+}
+
+/* ---------- 点在多边形内（射线法）—— 禁炸区警告 ---------- */
+function ptInPoly(p, pts){
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++){
+    const xi = pts[i].x, yi = pts[i].y, xj = pts[j].x, yj = pts[j].y;
+    if (((yi > p.y) !== (yj > p.y)) &&
+        (p.x < (xj - xi) * (p.y - yi) / (yj - yi) + xi)) inside = !inside;
+  }
+  return inside;
+}
+function noFireHit(p){
+  return S.polys.find(pg => pg.nofire && ptInPoly(p, pg.pts)) || null;
+}
+
+function drawSolution(){
+  if (S.mortar){
+    ring(S.mortar.x, S.mortar.y, MAX_R, 'rgba(47,111,79,.5)');
+    ring(S.mortar.x, S.mortar.y, MIN_R, 'rgba(163,50,44,.5)');
+  }
+  const showT = S.mode==='solve' || S.mode==='correct';
+  if (S.mode==='solve' && S.mortar && S.target){
+    seg(S.mortar, S.target, '#2f6f4f', [7,4]);
+    const {dist, az} = solveVector(S.target.x-S.mortar.x, S.target.y-S.mortar.y);
+    const mid = w2s((S.mortar.x+S.target.x)/2, (S.mortar.y+S.target.y)/2);
+    const txt = Math.round(dist)+' m / '+faz(az);
+    ctx.font = '11.5px ui-monospace,Consolas,monospace';
+    const w = ctx.measureText(txt).width + 14;
+    ctx.fillStyle = 'rgba(28,32,36,.88)';
+    ctx.beginPath();
+    const bx = mid.x-w/2, by = mid.y-10;
+    if (ctx.roundRect) { ctx.roundRect(bx,by,w,20,5); ctx.fill(); }
+    else ctx.fillRect(bx,by,w,20);
+    ctx.fillStyle = '#fff'; ctx.fillText(txt, bx+7, by+14);
+  }
+  if (S.mode==='correct' && S.mortar && S.impact) seg(S.mortar, S.impact, '#a8621a', [4,4]);
+  if (S.mode==='predict' && S.mortar && S.predPoint) seg(S.mortar, S.predPoint, '#2a5f9e', [7,4]);
+  if (showT && S.target) dot(S.target.x, S.target.y, '#a3322c', '目标', fx(S.target.x)+', '+fx(S.target.y));
+  if (S.mode==='correct' && S.impact) dot(S.impact.x, S.impact.y, '#a8621a', '弹坑', fx(S.impact.x)+', '+fx(S.impact.y));
+  if (S.mode==='predict' && S.predPoint) dot(S.predPoint.x, S.predPoint.y, '#2a5f9e', '落点', fx(S.predPoint.x)+', '+fx(S.predPoint.y));
+  if (S.mortar) dot(S.mortar.x, S.mortar.y, '#2f6f4f', '炮位', fx(S.mortar.x)+', '+fx(S.mortar.y));
+}
+
+/* ---------- 地图交互 ---------- */
+function clampCoord(p){
+  return { x: Math.round(Math.max(0, Math.min(163.84, p.x))*100)/100,
+           y: Math.round(Math.max(0, Math.min(163.84, p.y))*100)/100 };
+}
+function hitMarker(px, py){
+  const list = [];
+  if (S.mortar) list.push(['mortar', S.mortar]);
+  if ((S.mode==='solve'||S.mode==='correct') && S.target) list.push(['target', S.target]);
+  if (S.mode==='correct' && S.impact) list.push(['impact', S.impact]);
+  if (S.showMarks) for (const mk of S.marks) list.push([{mark:mk.id}, mk]);
+  for (let i=list.length-1; i>=0; i--){
+    const p = w2s(list[i][1].x, list[i][1].y);
+    if (Math.hypot(p.x-px, p.y-py) <= 13) return list[i][0];
+  }
+  return null;
+}
+let drag = null, panning = null, moved = false;
+
+canvas.addEventListener('pointerdown', e => {
+  const r = canvas.getBoundingClientRect();
+  const px = e.clientX-r.left, py = e.clientY-r.top;
+  moved = false;
+  const hit = hitMarker(px, py);
+  if (hit){ drag = hit; canvas.setPointerCapture(e.pointerId); }
+  else { panning = {px, py}; canvas.setPointerCapture(e.pointerId); }
+});
+canvas.addEventListener('pointermove', e => {
+  const r = canvas.getBoundingClientRect();
+  const px = e.clientX-r.left, py = e.clientY-r.top;
+  const w = s2w(px, py);
+  $('cursorCoord').textContent = 'X ' + fx(w.x) + ' / Y ' + fx(w.y);
+  if (drag){
+    moved = true;
+    const c = clampCoord(w);
+    if (drag === 'mortar') S.mortar = c;
+    else if (drag === 'target') S.target = c;
+    else if (drag === 'impact') S.impact = c;
+    else if (drag && drag.mark != null){
+      const mk = S.marks.find(m => m.id === drag.mark);
+      if (mk){ mk.x = c.x; mk.y = c.y; if (S.mode === 'tools') renderToolPane(); }
+    }
+    syncFromState(); run();
+  } else if (panning){
+    moved = true;
+    S.view.cx -= (px - panning.px)/S.view.scale;
+    S.view.cy += (py - panning.py)/S.view.scale;
+    panning = {px, py}; draw();
+  }
+});
+['pointerup','pointercancel'].forEach(ev => canvas.addEventListener(ev, () => { drag = null; panning = null; }));
+
+canvas.addEventListener('click', e => {
+  if (moved) return;                       // 拖动结束不当作点击
+  const r = canvas.getBoundingClientRect();
+  const w = s2w(e.clientX-r.left, e.clientY-r.top);
+  if (hitMarker(e.clientX-r.left, e.clientY-r.top)) return;
+  const c = clampCoord(w);
+  if (S.mode === 'tools'){ handleToolClick(c); return; }
+  if (S.mode === 'build'){ if (S.buildArm) placeBuild(c); return; }
+  if (S.mode !== 'solve' && S.mode !== 'predict' && S.mode !== 'correct') return;  // 情报/射表/设置只浏览
+  if (S.mode === 'predict'){
+    if (!S.mortar){ S.mortar = c; syncFromState(); run(); return; }
+    const {dist, az} = solveVector(c.x-S.mortar.x, c.y-S.mortar.y);
+    $('paz').value = az.toFixed(1);
+    $('prng').value = Math.round(dist);
+    $('pmil').value = '';
+    run(); return;
+  }
+  if (S.put === 'mortar') S.mortar = c;
+  else if (S.put === 'target') S.target = c;
+  else if (S.put === 'impact') S.impact = c;
+  syncFromState(); run();
+});
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const r = canvas.getBoundingClientRect();
+  const anchor = s2w(e.clientX-r.left, e.clientY-r.top);
+  S.view.scale = Math.max(0.8, Math.min(400, S.view.scale * (e.deltaY < 0 ? 1.2 : 1/1.2)));
+  const after = s2w(e.clientX-r.left, e.clientY-r.top);
+  S.view.cx += anchor.x - after.x;
+  S.view.cy += anchor.y - after.y;
+  draw();
+}, {passive:false});
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+/* ---------- 工具条 ---------- */
+const mapBar = $('mapBtns');
+Object.values(MAPS).forEach(m => {
+  const b = document.createElement('button');
+  b.className = 'btn' + (m.id === S.mapId ? ' on' : '');
+  b.type = 'button'; b.textContent = m.name; b.dataset.map = m.id;
+  b.onclick = () => {
+    S.mapId = m.id;
+    mapBar.querySelectorAll('button').forEach(x => x.classList.toggle('on', x.dataset.map === m.id));
+    tileFail = 0; tileOk = 0; fitMap(); draw(); run(); save();
+  };
+  mapBar.appendChild(b);
+});
+function applySrcMode(){
+  const b = $('btnSrc');
+  b.textContent = '底图 ' + SRC_TXT[S.srcMode];
+  b.title = '底图来源：自动（本地优先，缺失回退在线）/ 本地（只读本地 tiles 目录）/ 在线（只读社区 CDN）';
+  b.classList.toggle('on', S.srcMode === 'local');
+  for (const m of Object.values(MAPS)) delete probe[m.id];
+  tileFail = 0; tileOk = 0; lastW = 0;
+  draw();
+}
+$('btnSrc').onclick = () => {
+  S.srcMode = SRC_SEQ[(SRC_SEQ.indexOf(S.srcMode) + 1) % SRC_SEQ.length];
+  try { localStorage.setItem(SRC_KEY, S.srcMode); } catch(e){}
+  applySrcMode();
+};
+$('btnGrid').onclick = () => { S.showGrid = !S.showGrid; $('btnGrid').classList.toggle('on', S.showGrid); draw(); };
+$('btnPoi').onclick  = () => { S.showPoi  = !S.showPoi;  $('btnPoi').classList.toggle('on', S.showPoi);  draw(); };
+$('btnFit').onclick  = () => { fitMap(); draw(); };
+$('btnGrid').classList.add('on'); $('btnPoi').classList.add('on');
+
+/* ============================================================
+   面板逻辑（与精简版一致）
+   ============================================================ */
+const MODE_HINT = {
+  solve:'点击地图放置点位 · 滚轮缩放 · 按住拖动 · 可拖动已放好的标记',
+  predict:'点击地图放置炮位，再点一下就设定目标方向',
+  tools:'选择上方工具，然后在地图上点。滚轮缩放 · 按住拖动平移',
+  intel:'点击列表里的「定位」跳转 · 地图只作浏览（拖动 / 滚轮）',
+  build:'选好建筑点「放到地图上」，再点地图落点 · 右上按钮可取消',
+  table:'浏览射表，地图只作浏览',
+  settings:'设置与数据备份'
+};
+function refreshPaneUI(){
+  document.querySelectorAll('.tab').forEach(x => x.classList.toggle('on', x.dataset.mode === S.mode));
+  document.querySelectorAll('.pane').forEach(x => x.classList.toggle('on', x.id === 'pane-'+S.mode));
+  $('hintText').textContent = MODE_HINT[S.mode] || MODE_HINT.solve;
+}
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+  S.mode = t.dataset.mode;
+  S.predPoint = null;
+  if (S.mode==='solve' || S.mode==='predict' || S.mode==='correct'){
+    S.put = 'mortar';
+    const pk = document.querySelector('#pick-'+S.mode+' button[data-put="mortar"]');
+    if (pk) pk.parentNode.querySelectorAll('button').forEach(b => b.classList.toggle('on', b === pk));
+  }
+  if (S.mode==='tools') renderToolPane();
+  if (S.mode==='intel') renderIntel();
+  if (S.mode==='build') renderBuild();
+  if (S.mode==='table') renderTable();
+  if (S.mode==='settings') renderSettings();
+  refreshPaneUI(); syncFromState(); run();
+}));
+document.querySelectorAll('.pick').forEach(pk => pk.querySelectorAll('button').forEach(b =>
+  b.addEventListener('click', () => {
+    pk.querySelectorAll('button').forEach(x => x.classList.remove('on'));
+    b.classList.add('on'); S.put = b.dataset.put;
+    $('hintText').textContent = '点击地图放置' + ({mortar:'炮位',target:'目标',impact:'弹坑'})[S.put];
+  })));
+
+function syncFromState(){
+  if (S.mortar){
+    $('mx').value = fx(S.mortar.x); $('my').value = fx(S.mortar.y);
+    $('pmx').value = fx(S.mortar.x); $('pmy').value = fx(S.mortar.y);
+    $('cmx').value = fx(S.mortar.x); $('cmy').value = fx(S.mortar.y);
+  }
+  if (S.target){ $('tx').value = fx(S.target.x); $('ty').value = fx(S.target.y);
+    $('ctx').value = fx(S.target.x); $('cty').value = fx(S.target.y); }
+  if (S.impact){ $('cix').value = fx(S.impact.x); $('ciy').value = fx(S.impact.y); }
+}
+function readStateFromInputs(){
+  const g = (x,y) => { const a = parseNum($(x).value), b = parseNum($(y).value);
+    return (a==null || b==null) ? null : {x:a,y:b}; };
+  if (S.mode === 'solve'){ S.mortar = g('mx','my'); S.target = g('tx','ty'); }
+  else if (S.mode === 'predict'){ S.mortar = g('pmx','pmy'); }
+  else if (S.mode === 'correct'){ S.mortar = g('cmx','cmy'); S.target = g('ctx','cty'); S.impact = g('cix','ciy'); }
+  /* 其余模式（工具/情报/射表/设置）不动现有状态 */
+}
+[['pIns','mx','my'],['pIns2','pmx','pmy']].forEach(([id,x,y])=>{
+  const n = $(id); if (!n) return;
+  n.addEventListener('input', () => {
+    const pr = parsePair(n.value); if (!pr) return;
+    $(x).value = fx(pr.x); $(y).value = fx(pr.y); run();
+  });
+});
+$('pmil').addEventListener('input', () => { if ($('pmil').value.trim()) $('prng').value = ''; });
+$('prng').addEventListener('input', () => { if ($('prng').value.trim()) $('pmil').value = ''; });
+
+function run(){
+  readStateFromInputs();
+  if (S.mode === 'solve') doSolve();
+  if (S.mode === 'predict') doPredict();
+  if (S.mode === 'correct') doCorrect();
+  draw(); save();
+}
+
+function doSolve(){
+  const o = $('out-solve');
+  const {mortar, target} = S;
+  if (!mortar || !target){
+    o.innerHTML = '<div class="status warn">把炮位和目标的 X / Y 都填上，或者在地图上点两下。</div>'; return;
+  }
+  const {dist, az} = solveVector(target.x-mortar.x, target.y-mortar.y);
+  const mil = rangeToMil(dist), milR = Math.round(mil);
+  const distAtMil = milToRange(milR);
+  const spread = dist * MOA50;
+  let stCls = 'ok', stTxt = '';
+  if (dist < MIN_R){ stCls='bad'; stTxt = `太近了——低于 L81 最小射程 ${MIN_R} m，这一发打不出去。把炮位往回挪。`; }
+  else if (dist > MAX_R){ stCls='bad'; stTxt = `太远了——超出 L81 最大射程 ${MAX_R} m 约 ${Math.round(dist-MAX_R)} m。往前推炮位。`; }
+  else if (dist > MAX_R-40){ stCls='warn'; stTxt = `贴近最大射程（${MAX_R} m），密位随距离变化极快，能挪近一点就挪近一点。`; }
+  else stTxt = `目标在有效射程内（${MIN_R}–${MAX_R} m）。表内插值密位 ${mil.toFixed(1)}，取整 ${milR} → 对应 ${Math.round(distAtMil)} m。`;
+  S.lastAz = az;
+  const nfT = noFireHit(target);
+  const nfHtml = nfT ? `<div class="status bad">🚫 目标位于禁炸区「${nfT.name}」内——确认真的要打这里吗？</div>` : '';
+  o.innerHTML = `
+    <div class="readout">
+      <div class="ro big"><div class="k">密位 MIL（右边仰角）</div><div class="v">${fm0(milR)}<small>密位</small></div></div>
+      <div class="ro"><div class="k">RNG 距离（左边滑杆）</div><div class="v">${fm0(dist)}<small>m</small></div></div>
+      <div class="ro"><div class="k">方位角 AZIMUTH</div><div class="v">${faz(az)}</div></div>
+    </div>
+    <div class="cmd"><span class="lb">射击口令</span>方位 ${faz(az)}，距离 ${fm0(dist)}，密位 ${fm0(milR)}</div>
+    <div class="status ${stCls}">${stTxt}</div>
+    ${nfHtml}
+    <div class="kv">
+      <div><span>ΔX / ΔY（坐标单位）</span><span>${(target.x-mortar.x).toFixed(2)} / ${(target.y-mortar.y).toFixed(2)}</span></div>
+      <div><span>精确距离</span><span>${dist.toFixed(1)} m</span></div>
+      <div><span>取整密位对应射程</span><span>${Math.round(distAtMil)} m</span></div>
+      <div><span>50 MOA 散布</span><span>± ${spread.toFixed(1)} m</span></div>
+    </div>
+    <div style="margin-top:11px"><button class="btn" id="cp1" type="button">复制射击口令</button></div>`;
+  $('cp1').onclick = () => copy(`方位 ${faz(az)}，距离 ${fm0(dist)}，密位 ${fm0(milR)}`);
+}
+
+function doPredict(){
+  const o = $('out-predict');
+  const mortar = S.mortar;
+  const azIn = parseNum($('paz').value);
+  const milIn = parseNum($('pmil').value);
+  const rngIn = parseNum($('prng').value);
+  if (!mortar){ S.predPoint = null;
+    o.innerHTML = '<div class="status warn">先填炮位坐标，或在地图上点一下放炮位。</div>'; return; }
+  if (azIn == null){ S.predPoint = null;
+    o.innerHTML = '<div class="status warn">填一个方位角（0–360，0=北 90=东）。</div>'; return; }
+  if (milIn == null && rngIn == null){ S.predPoint = null;
+    o.innerHTML = '<div class="status warn">密位和 RNG 至少填一个。</div>'; return; }
+  let dist, srcTxt;
+  if (milIn != null){ dist = milToRange(milIn); srcTxt = `由密位 ${fm0(milIn)} 反查射表`; }
+  else { dist = rngIn; srcTxt = '由 RNG 距离直接给出'; }
+  const pt = unitToXY(mortar.x, mortar.y, azIn, dist);
+  const clX = Math.max(0, Math.min(163.84, pt.x)), clY = Math.max(0, Math.min(163.84, pt.y));
+  const off = Math.abs(clX-pt.x) > 1e-9 || Math.abs(clY-pt.y) > 1e-9;
+  const c = { x: Math.round(clX*100)/100, y: Math.round(clY*100)/100 };
+  S.predPoint = c;
+  const milBack = rangeToMil(dist);
+  let stCls='ok', stTxt='';
+  if (dist < MIN_R){ stCls='bad'; stTxt = `射程 ${Math.round(dist)} m 低于最小射程 ${MIN_R} m，打不到。`; }
+  else if (dist > MAX_R + 13){ stCls='bad'; stTxt = `射程 ${Math.round(dist)} m 超出射表上限，炮弹会在更近处落地。`; }
+  else if (dist > MAX_R){ stCls='warn'; stTxt = `射程 ${Math.round(dist)} m 略超 ${MAX_R} m，已外推，实际会打短。`; }
+  else stTxt = `落点如下，${srcTxt}。`;
+  const nfP = noFireHit(c);
+  const nfHtml = nfP ? `<div class="status bad">🚫 预测落点位于禁炸区「${nfP.name}」内！先撤销禁炸区或换落点。</div>` : '';
+  o.innerHTML = `
+    <div class="readout">
+      <div class="ro big"><div class="k">预测落点 X / Y</div><div class="v">${fx(c.x)} <small>,</small> ${fx(c.y)}</div></div>
+      <div class="ro"><div class="k">射程</div><div class="v">${fm0(dist)}<small>m</small></div></div>
+      <div class="ro"><div class="k">对应密位</div><div class="v">${fm0(milBack)}</div></div>
+    </div>
+    <div class="status ${stCls}">${stTxt}${off ? '（原始落点超出地图边界，已截断）' : ''}</div>
+    ${nfHtml}
+    <div class="kv">
+      <div><span>方位角</span><span>${faz(azIn)}</span></div>
+      <div><span>落点相对炮位偏移</span><span>ΔX ${(c.x-mortar.x).toFixed(2)} / ΔY ${(c.y-mortar.y).toFixed(2)}</span></div>
+      <div><span>50 MOA 散布</span><span>± ${(dist*MOA50).toFixed(1)} m</span></div>
+    </div>`;
+}
+
+function doCorrect(){
+  const o = $('out-correct');
+  const {mortar, target, impact} = S;
+  if (!mortar || !impact){
+    o.innerHTML = '<div class="status warn">填上炮位和弹坑坐标（目标可以留空）。</div>'; return;
+  }
+  const imp = solveVector(impact.x-mortar.x, impact.y-mortar.y);
+  if (!target){
+    o.innerHTML = `
+      <div class="readout">
+        <div class="ro big"><div class="k">弹坑相对炮位</div><div class="v">${Math.round(imp.dist)}<small>m /</small> ${faz(imp.az)}</div></div>
+        <div class="ro"><div class="k">该射程对应密位</div><div class="v">${fm0(rangeToMil(imp.dist))}</div></div>
+        <div class="ro"><div class="k">50 MOA 散布</div><div class="v">± ${(imp.dist*MOA50).toFixed(1)}<small>m</small></div></div>
+      </div>
+      <div class="status warn">没有目标坐标，只能核对弹坑落点。填上目标坐标才是真正的修正量。</div>`;
+    return;
+  }
+  const tgt = solveVector(target.x-mortar.x, target.y-mortar.y);
+  let dAz = tgt.az - imp.az;
+  while (dAz > 180) dAz -= 360; while (dAz < -180) dAz += 360;
+  const dR = tgt.dist - imp.dist;
+  const newMil = Math.round(rangeToMil(tgt.dist));
+  const drTxt = Math.abs(dR) < 2 ? '距离基本对，只要修方向'
+    : (dR > 0 ? `打短了 ${Math.round(dR)} m → 要<b>加距离</b>` : `打远了 ${Math.round(-dR)} m → 要<b>减距离</b>`);
+  const daTxt = Math.abs(dAz) < 0.5 ? '方向基本对'
+    : (dAz > 0 ? `偏左 ${Math.abs(dAz).toFixed(1)}° → 往<b>右</b>转` : `偏右 ${Math.abs(dAz).toFixed(1)}° → 往<b>左</b>转`);
+  o.innerHTML = `
+    <div class="readout">
+      <div class="ro big"><div class="k">修正后密位 / 方位</div><div class="v">${fm0(newMil)} <small>密位 /</small> ${faz(tgt.az)}</div></div>
+      <div class="ro"><div class="k">距离修正</div><div class="v">${dR>=0?'+':''}${Math.round(dR)}<small>m</small></div></div>
+      <div class="ro"><div class="k">方向修正</div><div class="v">${dAz>=0?'+':''}${dAz.toFixed(1)}<small>°</small></div></div>
+    </div>
+    <div class="cmd"><span class="lb">修正口令</span>${Math.abs(dR)>=2 ? (dR>0?'加':'减')+Math.abs(Math.round(dR))+'米 · ' : ''}${Math.abs(dAz)>=0.5 ? (dAz>0?'右转':'左转')+' '+Math.abs(dAz).toFixed(1)+'° · ' : ''}
+方位 ${faz(tgt.az)}，距离 ${fm0(tgt.dist)}，密位 ${fm0(newMil)}</div>
+    <div class="status ok">${drTxt}；${daTxt}。L81 上<b>密位调小 = 打得更远</b>。</div>
+    <div class="kv">
+      <div><span>目标距离 / 方位</span><span>${Math.round(tgt.dist)} m / ${faz(tgt.az)}</span></div>
+      <div><span>弹坑距离 / 方位</span><span>${Math.round(imp.dist)} m / ${faz(imp.az)}</span></div>
+      <div><span>落点偏差（直线）</span><span>${Math.round(Math.hypot(target.x-impact.x, target.y-impact.y)*100)} m</span></div>
+    </div>`;
+}
+
+function copy(txt){
+  const done = () => flash('已复制');
+  const fb = () => { const ta = document.createElement('textarea'); ta.value = txt;
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); done(); } catch(e){}
+    document.body.removeChild(ta); };
+  if (navigator.clipboard) navigator.clipboard.writeText(txt).then(done, fb); else fb();
+}
+let flashT = 0;
+function flash(msg){
+  const d = document.createElement('div'); d.textContent = msg;
+  d.style.cssText = 'position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#1c2024;'+
+    'color:#fff;font:12.5px system-ui;padding:8px 14px;border-radius:7px;z-index:99';
+  document.body.appendChild(d);
+  clearTimeout(flashT); flashT = setTimeout(() => d.remove(), 1400);
+}
+
+/* ============================================================
+   v2 战术工具箱
+   ============================================================ */
+const SPAWN_ICONS = ['valkyra','manticore','lonestar'];
+const poisOf = (m, kind) => m.markers.filter(k =>
+  kind==='tower'  ? k.icon==='tower' :
+  kind==='spawn'  ? SPAWN_ICONS.includes(k.icon) :
+  kind==='vendor' ? !SPAWN_ICONS.includes(k.icon) && k.icon!=='tower' : true);
+const distM = (a,b) => Math.round(Math.hypot(a.x-b.x, a.y-b.y)*100);
+
+/* ---------- v3 建造目录（社区数据，建材=Build Supplies 单位） ---------- */
+const BUILD_CATALOG = [
+  {k:'fob',    n:'前哨基地 FOB',   s:30,   tier:'—', cat:'核心', price:7500, note:'$7,500 / 60m 建造半径 / 团队仓库'},
+  {k:'tent',   n:'侦察帐篷',       s:5,    tier:'S', cat:'免FOB', note:'隐藏侦察兵红外特征'},
+  {k:'wire',   n:'铁丝网',         s:5,    tier:'S', cat:'免FOB', note:'迟滞步兵，拆敌方的赔 $75'},
+  {k:'sandbag',n:'沙袋',           s:10,   tier:'S', cat:'免FOB', note:'腰部射击掩体'},
+  {k:'hedge',  n:'刺猬障碍',       s:14,   tier:'S', cat:'免FOB', note:'阻挡车辆'},
+  {k:'hs_s',   n:'HESCO 墩（小）', s:10,   tier:'M', cat:'工事', note:'可叠 6 层'},
+  {k:'bremer', n:'布雷默墙',       s:10,   tier:'M', cat:'工事', note:'窄高墙，自带顶部铁丝'},
+  {k:'radio',  n:'建造者电台',     s:13,   tier:'M', cat:'功能', note:'放音乐'},
+  {k:'door',   n:'门',             s:14,   tier:'M', cat:'工事', note:'仅己方步兵通行'},
+  {k:'hs_l',   n:'HESCO 墩（大）', s:14,   tier:'M', cat:'工事', note:'可叠 3 层'},
+  {k:'hs_wall',n:'HESCO 墙',       s:46,   tier:'M', cat:'工事', note:'=4 个大墩，性价比最高'},
+  {k:'gate',   n:'大门',           s:52,   tier:'M', cat:'工事', note:'车辆入口'},
+  {k:'speaker',n:'扩音器',         s:61,   tier:'M', cat:'功能', note:'全区广播'},
+  {k:'bunker', n:'掩体',           s:61,   tier:'L', cat:'工事'},
+  {k:'rtower', n:'侦察塔',         s:61,   tier:'L', cat:'功能', note:'制高点，可架 SAM'},
+  {k:'ifs',    n:'间接火力掩体',   s:61,   tier:'L', cat:'工事', note:'四门气锁结构'},
+  {k:'sting',  n:'Stingray',       s:91,   tier:'L', cat:'火力', note:'反装甲迫击炮'},
+  {k:'mortar', n:'L81 迫击炮',     s:91,   tier:'L', cat:'火力', note:'沙袋贴身、HESCO 隔一格留射弧'},
+  {k:'refuel', n:'加油站',         s:121,  tier:'L', cat:'后勤'},
+  {k:'repair', n:'维修站',         s:121,  tier:'L', cat:'后勤'},
+  {k:'sam',    n:'Talon 9K 防空',  s:601,  tier:'L', cat:'火力', note:'地空导弹，最好架高'},
+  {k:'ciws',   n:'Vanguard 近防炮',s:901,  tier:'L', cat:'火力', note:'手动加特林防空'},
+  {k:'drill',  n:'钻井平台',       s:1351, tier:'L', cat:'特殊', note:'耗燃料把 Hot Zone 拉过来'},
+];
+const BUILD_PRESETS = {
+  aa:       { fob:1, hs_s:12, rtower:1, sam:1 },
+  mortarpit:{ fob:1, sandbag:8, hs_wall:4, mortar:1 },
+  drill:    { fob:1, hs_wall:8, gate:1, rtower:1, drill:1, refuel:1 },
+  field:    { wire:10, sandbag:10, hedge:4, tent:2 },
+};
+const FOB_RADIUS = 60;
+const UNIT_PRICE = 10, PALLET = 1800, UNIT_KG = 0.02;
+
+/* ---------- 计算按钮 + 战斗记录 ---------- */
+function logShot(txt){
+  S.hist.unshift({ t:Date.now(), map:MAP().name, txt });
+  if (S.hist.length > 60) S.hist.length = 60;
+}
+$('btnSolve').onclick   = () => { run(); if (S.mortar && S.target){
+  const {dist,az} = solveVector(S.target.x-S.mortar.x, S.target.y-S.mortar.y);
+  logShot(`算诸元 → 方位 ${faz(az)} 距离 ${fm0(dist)} 密位 ${fm0(rangeToMil(dist))}`); save(); } };
+$('btnPredict').onclick = () => { run(); if (S.predPoint)
+  logShot(`推落点 → ${fx(S.predPoint.x)}, ${fx(S.predPoint.y)}`); save(); };
+$('btnCorrect').onclick = () => { run(); if (S.mortar && S.impact && S.target)
+  logShot(`修偏差 → 密位 ${fm0(rangeToMil(solveVector(S.target.x-S.mortar.x, S.target.y-S.mortar.y).dist))}`); save(); };
+
+/* ---------- 工具面板 ---------- */
+function handleToolClick(c){
+  if (S.tool === 'ruler'){
+    if (!S.ruler.a || S.ruler.b) S.ruler = { a:c, b:null };
+    else S.ruler.b = c;
+  } else if (S.tool === 'circle'){
+    if (!S.pend){ S.pend = { p:c, kind:'circle' }; flash('再点一下确定半径'); }
+    else {
+      const r = Math.max(10, Math.round(Math.hypot(c.x-S.pend.p.x, c.y-S.pend.p.y)*100));
+      S.circles.push({ x:S.pend.p.x, y:S.pend.p.y, r, name:'圈' + (S.seq++) });
+      S.pend = null;
+    }
+  } else if (S.tool === 'ray'){
+    if (!S.pend){ S.pend = { p:c, kind:'ray' }; flash('再点一下确定方向'); }
+    else {
+      const { az } = solveVector(c.x-S.pend.p.x, c.y-S.pend.p.y);
+      S.rays.push({ x:S.pend.p.x, y:S.pend.p.y, az:Math.round(az*10)/10, name:'线' + (S.seq++) });
+      S.pend = null;
+    }
+  } else if (S.tool === 'marker'){
+    const id = S.seq++;
+    S.marks.push({ id, x:c.x, y:c.y, name:'标记' + id,
+      color:MARK_COLORS[S.marks.length % MARK_COLORS.length] });
+  } else if (S.tool === 'route'){
+    S.route.pts.push(c);
+  } else if (S.tool === 'poly'){
+    if (!S.polyDraft) S.polyDraft = { pts:[c] };
+    else {
+      // 点在起点附近（12px 内）→ 闭合
+      const first = S.polyDraft.pts[0];
+      const fp = w2s(first.x, first.y), cp = w2s(c.x, c.y);
+      if (S.polyDraft.pts.length >= 3 && Math.hypot(fp.x-cp.x, fp.y-cp.y) <= 12) closePoly();
+      else S.polyDraft.pts.push(c);
+    }
+  }
+  renderToolPane(); draw(); save();
+}
+function closePoly(){
+  if (!S.polyDraft || S.polyDraft.pts.length < 3){ S.polyDraft = null; return; }
+  const id = S.seq++;
+  S.polys.push({ id, pts:S.polyDraft.pts, name:'区' + id,
+    color:'rgba(163,50,44,.55)', nofire:true });
+  S.polyDraft = null;
+  flash('区域已闭合，可在列表里改名/切换禁炸');
+}
+
+/* ---------- v3 建造规划 ---------- */
+function buildEntry(k){ return BUILD_CATALOG.find(b => b.k === k); }
+function nearestFobDist(p){
+  let best = Infinity;
+  for (const b of S.builds) if (b.k === 'fob')
+    best = Math.min(best, Math.hypot(b.x-p.x, b.y-p.y)*100);
+  return best;
+}
+function placeBuild(c){
+  const e = buildEntry(S.buildArm); if (!e) return;
+  const id = S.seq++;
+  S.builds.push({ id, k:e.k, x:c.x, y:c.y, name:e.n });
+  if (!e.fob && e.k !== 'fob'){
+    const d = nearestFobDist(c);
+    if (d > FOB_RADIUS) flash('⚠ 不在任何 FOB 半径内（最近 ' + Math.round(d) + ' m），游戏里放不下');
+  }
+  S.buildArm = null;                 // 放置即解除待放；连放多个需再点「放到地图上」
+  renderBuild(); draw(); save();
+  $('hintText').textContent = MODE_HINT.build;
+}
+function drawBuildsLayer(){
+  for (const b of S.builds){
+    const e = buildEntry(b.k);
+    const p = w2s(b.x, b.y);
+    if (b.k === 'fob'){
+      const r = FOB_RADIUS/100*S.view.scale;
+      ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI*2);
+      ctx.strokeStyle = 'rgba(43,124,201,.9)'; ctx.lineWidth = 2;
+      ctx.setLineDash([]); ctx.stroke();
+      ctx.fillStyle = 'rgba(43,124,201,.07)'; ctx.fill();
+    }
+    const bad = e.k !== 'fob' && !e.cat.includes('免') && nearestFobDist(b) > FOB_RADIUS;
+    ctx.beginPath(); ctx.arc(p.x, p.y, 5.5, 0, Math.PI*2);
+    ctx.fillStyle = bad ? '#a3322c' : (b.k==='fob' ? '#2b7cc9' : '#2f6f4f'); ctx.fill();
+    ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke();
+    ctx.font = '600 10.5px system-ui';
+    const tw = ctx.measureText(b.name).width + 8;
+    ctx.fillStyle = 'rgba(255,255,255,.94)'; ctx.fillRect(p.x+7, p.y-13, tw, 16);
+    ctx.fillStyle = bad ? '#a3322c' : (b.k==='fob' ? '#2b7cc9' : '#1d4d35');
+    ctx.fillText(b.name + (bad ? ' ⚠圈外' : ''), p.x+11, p.y-1);
+  }
+}
+function renderToolPane(){
+  const o = $('out-tool');
+  document.querySelectorAll('#toolGrid button').forEach(b =>
+    b.classList.toggle('on', b.dataset.tool === S.tool));
+  if (S.tool === 'ruler'){
+    const {a, b} = S.ruler;
+    o.innerHTML = !a
+      ? '<div class="status warn">在地图上点两下，量任意两点的距离和方位。</div>'
+      : !b ? '<div class="status warn">起点已放好，再点一下结束。</div>'
+      : (() => { const {dist, az} = solveVector(b.x-a.x, b.y-a.y);
+          return `<div class="readout">
+            <div class="ro big"><div class="k">两点直线距离</div><div class="v">${fm0(dist)}<small>m</small></div></div>
+            <div class="ro"><div class="k">方位（a→b）</div><div class="v">${faz(az)}</div></div>
+            <div class="ro"><div class="k">坐标差</div><div class="v" style="font-size:16px">${fx(a.x)},${fx(a.y)} → ${fx(b.x)},${fx(b.y)}</div></div>
+          </div><button class="btn" id="tlClear" type="button" style="width:100%;margin-top:10px">重新量</button>`; })();
+    const cl = $('tlClear'); if (cl) cl.onclick = () => { S.ruler = {a:null,b:null}; renderToolPane(); draw(); save(); };
+  }
+  if (S.tool === 'circle'){
+    o.innerHTML = '<div class="status warn">点第一下 = 圆心，第二下 = 半径。也可以用下面的预设半径：点一下圆心即可。</div>'
+      + '<div class="segrow" style="margin-top:10px"><label>预设</label>'
+      + RADIUS_PRESETS.map(r => `<button class="btn" data-pr="${r}" type="button">${r} m</button>`).join('')
+      + '</div>'
+      + listHtml(S.circles.map(c => `
+          <div class="li"><span class="nm" style="color:#7a3f9d">${c.name}</span>
+            <span class="co">${fx(c.x)}, ${fx(c.y)} · ${Math.round(c.r)} m</span><span class="sp"></span>
+            <button class="btn" data-crd="${c.name}" data-d="-50" type="button">-50</button>
+            <button class="btn" data-crd="${c.name}" data-d="50" type="button">+50</button>
+            <button class="btn" data-cdel="${c.name}" type="button">删</button></div>`),
+          S.circles.length ? '' : '<div class="li"><span class="co">还没有半径圈</span></div>');
+    o.querySelectorAll('[data-pr]').forEach(b => b.onclick = () => {
+      S.circles.push({ x:S.mortar ? S.mortar.x : S.view.cx, y:S.mortar ? S.mortar.y : S.view.cy,
+        r:+b.dataset.pr, name:'圈'+(S.seq++) });
+      renderToolPane(); draw(); save();
+    });
+    o.querySelectorAll('[data-cdel]').forEach(b => b.onclick = () => {
+      S.circles = S.circles.filter(c => c.name !== b.dataset.cdel); renderToolPane(); draw(); save(); });
+    o.querySelectorAll('[data-crd]').forEach(b => b.onclick = () => {
+      const c = S.circles.find(c => c.name === b.dataset.crd);
+      if (c){ c.r = Math.max(20, c.r + +b.dataset.d); renderToolPane(); draw(); save(); } });
+  }
+  if (S.tool === 'ray'){
+    o.innerHTML = '<div class="status warn">点第一下 = 起点，第二下 = 方向。用于报点：「敌人在这条线上」。</div>'
+      + listHtml(S.rays.map(ry => `
+          <div class="li"><span class="nm" style="color:#1c7a7a">${ry.name}</span>
+            <span class="co">${fx(ry.x)}, ${fx(ry.y)} · ${ry.az.toFixed(0)}°</span><span class="sp"></span>
+            <button class="btn" data-rdel="${ry.name}" type="button">删</button></div>`),
+          S.rays.length ? '' : '<div class="li"><span class="co">还没有方位线</span></div>');
+    o.querySelectorAll('[data-rdel]').forEach(b => b.onclick = () => {
+      S.rays = S.rays.filter(r => r.name !== b.dataset.rdel); renderToolPane(); draw(); save(); });
+  }
+  if (S.tool === 'marker'){
+    o.innerHTML = '<div class="status warn">在地图上点一下放一个标记，可以拖动、改名、换色。标记会记住。</div>'
+      + listHtml(S.marks.map(mk => `
+          <div class="li"><i style="width:10px;height:10px;border-radius:50%;background:${mk.color};flex:none"></i>
+            <input type="text" data-mnm="${mk.id}" value="${mk.name.replace(/"/g,'')}"
+              style="padding:4px 6px;font-size:12px;flex:1 1 90px;min-width:0">
+            <span class="co">${fx(mk.x)}, ${fx(mk.y)}</span><span class="sp"></span>
+            ${MARK_COLORS.map((c,i)=>`<button class="btn" data-mcl="${mk.id}" data-c="${c}" type="button"
+              style="padding:4px 7px;background:${c};border-color:${c}" title="换成这个颜色"></button>`).join('')}
+            <button class="btn" data-mtg="${mk.id}" type="button" title="设为迫击炮目标">设目标</button>
+            <button class="btn" data-mdel="${mk.id}" type="button">删</button></div>`),
+          S.marks.length ? '' : '<div class="li"><span class="co">还没有自定义标记</span></div>');
+    o.querySelectorAll('[data-mnm]').forEach(inp => inp.onchange = () => {
+      const mk = S.marks.find(m => m.id === +inp.dataset.mnm);
+      if (mk){ mk.name = inp.value.trim() || mk.name; draw(); save(); } });
+    o.querySelectorAll('[data-mcl]').forEach(b => b.onclick = () => {
+      const mk = S.marks.find(m => m.id === +b.dataset.mcl);
+      if (mk){ mk.color = b.dataset.c; renderToolPane(); draw(); save(); } });
+    o.querySelectorAll('[data-mdel]').forEach(b => b.onclick = () => {
+      S.marks = S.marks.filter(m => m.id !== +b.dataset.mdel); renderToolPane(); draw(); save(); });
+    o.querySelectorAll('[data-mtg]').forEach(b => b.onclick = () => {
+      const mk = S.marks.find(m => m.id === +b.dataset.mtg);
+      if (mk){ S.target = { x:mk.x, y:mk.y }; syncFromState();
+        document.querySelector('.tab[data-mode="solve"]').click(); } });
+  }
+  if (S.tool === 'route'){
+    const pts = S.route.pts;
+    let total = 0;
+    for (let i = 1; i < pts.length; i++)
+      total += Math.hypot(pts[i].x-pts[i-1].x, pts[i].y-pts[i-1].y) * 100;
+    o.innerHTML = '<div class="status warn">沿途点几下画出行军 / 巡逻路线，自动累加每段距离并画在图上。</div>'
+      + (pts.length > 1 ? `<div class="readout" style="margin-top:10px"><div class="ro big"><div class="k">路线总长（${pts.length-1} 段）</div><div class="v">${fm0(total)}<small>m</small></div></div></div>` : '')
+      + `<div class="segrow" style="margin-top:10px">
+          <button class="btn" id="rtUndo" type="button" ${pts.length?'':'disabled'}>撤销上一点</button>
+          <button class="btn" id="rtClear" type="button" ${pts.length?'':'disabled'}>清空路线</button></div>`;
+    const u = $('rtUndo'); if (u) u.onclick = () => { S.route.pts.pop(); renderToolPane(); draw(); save(); };
+    const cl = $('rtClear'); if (cl) cl.onclick = () => { S.route.pts = []; renderToolPane(); draw(); save(); };
+  }
+  if (S.tool === 'poly'){
+    const draftN = S.polyDraft ? S.polyDraft.pts.length : 0;
+    o.innerHTML = '<div class="status warn">连点几个点围一片区域，点起点圆圈（或「闭合区域」）收口。区域默认标记为<b>禁炸区</b>——算诸元 / 推落点落到区内会报警。</div>'
+      + (S.polyDraft ? `<div class="segrow" style="margin-top:10px"><label>正在画：${draftN} 个点</label>
+          <button class="btn" id="pyClose" type="button" ${draftN>=3?'':'disabled'}>闭合区域</button>
+          <button class="btn" id="pyCancel" type="button">放弃</button></div>` : '')
+      + listHtml(S.polys.map(pg => `
+          <div class="li"><span class="nm" style="color:${pg.color}">${pg.nofire?'🚫 ':''}${pg.name}</span>
+            <span class="co">${pg.pts.length} 个顶点</span><span class="sp"></span>
+            <button class="btn" data-pnf="${pg.id}" type="button">${pg.nofire?'改为普通区':'改为禁炸区'}</button>
+            <button class="btn" data-pdel="${pg.id}" type="button">删</button></div>`),
+          S.polys.length ? '' : '<div class="li"><span class="co">还没有区域</span></div>');
+    const c1 = $('pyClose'); if (c1) c1.onclick = () => { closePoly(); renderToolPane(); draw(); save(); };
+    const c2 = $('pyCancel'); if (c2) c2.onclick = () => { S.polyDraft = null; renderToolPane(); draw(); save(); };
+    o.querySelectorAll('[data-pnf]').forEach(b => b.onclick = () => {
+      const pg = S.polys.find(p => p.id === +b.dataset.pnf);
+      if (pg){ pg.nofire = !pg.nofire;
+        pg.color = pg.nofire ? 'rgba(163,50,44,.55)' : 'rgba(122,63,157,.55)';
+        renderToolPane(); draw(); save(); } });
+    o.querySelectorAll('[data-pdel]').forEach(b => b.onclick = () => {
+      S.polys = S.polys.filter(p => p.id !== +b.dataset.pdel); renderToolPane(); draw(); save(); });
+  }
+}
+document.querySelectorAll('#toolGrid button').forEach(b =>
+  b.addEventListener('click', () => { S.tool = b.dataset.tool; S.pend = null; renderToolPane(); draw(); save(); }));
+
+function listHtml(items, empty){
+  return items.join('') || empty || '';
+}
+
+/* ---------- 情报面板 ---------- */
+let poiFilter = 'all';
+function renderIntel(){
+  const m = MAP();
+  const spawns = poisOf(m, 'spawn'), towers = poisOf(m, 'tower');
+
+  /* 炮位推荐：谁打得到当前目标 */
+  if (S.target){
+    const cands = [];
+    for (const mk of S.marks) cands.push({ name:mk.name, co:mk, color:mk.color });
+    for (const t of towers) cands.push({ name:t.label, co:t });
+    for (const sp of spawns) cands.push({ name:sp.label + '（出生点）', co:sp });
+    const mid = (MIN_R + MAX_R) / 2;
+    cands.forEach(c => { c.d = distM(c.co, S.target); c.ok = c.d >= MIN_R && c.d <= MAX_R; });
+    cands.sort((a, b) => (b.ok - a.ok) || (Math.abs(a.d - mid) - Math.abs(b.d - mid)));
+    $('listCand').innerHTML = cands.map(c => `
+      <div class="li"><span class="nm" ${c.color?`style="color:${c.color}"`:''}>${c.name}</span>
+        <span class="co">→ 目标 ${fm0(c.d)} m</span><span class="sp"></span>
+        ${c.ok ? `<span class="badge ok">可架设 · 密位 ${fm0(rangeToMil(c.d))}</span>`
+               : `<span class="badge bad">${c.d < MIN_R ? '太近' : '超程'}</span>`}
+        <button class="btn" data-cd-x="${c.co.x}" data-cd-y="${c.co.y}" type="button">设炮位</button></div>`).join('')
+      || '<div class="li"><span class="co">没有候选位置</span></div>';
+    $('listCand').querySelectorAll('[data-cd-x]').forEach(b => b.onclick = () => {
+      S.mortar = { x:+b.dataset.cdX, y:+b.dataset.cdY }; syncFromState();
+      document.querySelector('.tab[data-mode="solve"]').click(); });
+  } else $('listCand').innerHTML = '<div class="li"><span class="co">先设一个目标，这里会列出哪些位置能打到它</span></div>';
+
+  /* 出生点决策矩阵 */
+  if (spawns.length && towers.length){
+    let h = '<table class="tbl mtx"><thead><tr><th>出生点 ↓ / 塔楼 →</th>'
+      + towers.map(t => `<th>${t.label}</th>`).join('') + '</tr></thead><tbody>';
+    for (const sp of spawns){
+      const ds = towers.map(t => distM(sp, t));
+      const best = Math.min(...ds);
+      h += `<tr><td>${sp.label}</td>` + towers.map((t, i) =>
+        `<td class="${ds[i]===best?'best':''}">${fm0(ds[i])}</td>`).join('') + '</tr>';
+    }
+    $('mtxSpawn').innerHTML = h + '</tbody></table>';
+  } else $('mtxSpawn').innerHTML = '<div class="li"><span class="co">这张图缺出生点或塔楼数据</span></div>';
+
+  /* 打击范围分析 */
+  const rngList = [];
+  for (const t of towers) rngList.push({ name:t.label, co:t, kind:'tower' });
+  for (const sp of spawns) rngList.push({ name:sp.label, co:sp, kind:'spawn' });
+  for (const mk of S.marks) rngList.push({ name:mk.name, co:mk, kind:'mark', color:mk.color });
+  if (S.mortar){
+    rngList.forEach(it => { it.d = distM(S.mortar, it.co); it.mil = Math.round(rangeToMil(it.d)); });
+    rngList.sort((a, b) => a.d - b.d);
+    $('listRange').innerHTML = rngList.map(it => {
+      const inR = it.d >= MIN_R && it.d <= MAX_R;
+      const badge = inR ? `<span class="badge ok">可打 · 密位 ${fm0(it.mil)}</span>`
+        : it.d < MIN_R ? `<span class="badge bad">太近 ${fm0(it.d)}</span>`
+        : `<span class="badge bad">超程 +${fm0(it.d-MAX_R)}m</span>`;
+      return `<div class="li"><span class="nm" ${it.color?`style="color:${it.color}"`:''}>${it.name}</span>
+        <span class="co">${fm0(it.d)} m · 方位 ${faz(solveVector(it.co.x-S.mortar.x, it.co.y-S.mortar.y).az)}</span>
+        <span class="sp"></span>${badge}
+        <button class="btn" data-ra-x="${it.co.x}" data-ra-y="${it.co.y}" type="button">设目标</button></div>`;
+    }).join('') || '<div class="li"><span class="co">没有可分析的目标</span></div>';
+    $('listRange').querySelectorAll('[data-ra-x]').forEach(b => b.onclick = () => {
+      S.target = { x:+b.dataset.raX, y:+b.dataset.raY }; syncFromState();
+      document.querySelector('.tab[data-mode="solve"]').click(); });
+  } else $('listRange').innerHTML = '<div class="li"><span class="co">先在「算诸元」里放一个炮位</span></div>';
+  const pois = poisOf(m, poiFilter);
+  $('listPoi').innerHTML = pois.map(k => `
+    <div class="li"><span class="nm" style="color:${k.icon==='tower'?'#a3322c':SPAWN_ICONS.includes(k.icon)?'#2f6f4f':'#2a3f5e'}">${k.label}</span>
+      <span class="co">${fx(k.x)}, ${fx(k.y)}</span><span class="sp"></span>
+      <button class="btn" data-loc-x="${k.x}" data-loc-y="${k.y}" type="button">定位</button>
+      <button class="btn" data-tg-x="${k.x}" data-tg-y="${k.y}" type="button">设目标</button></div>`).join('');
+  $('listPoi').querySelectorAll('[data-loc-x]').forEach(b => b.onclick = () => {
+    S.view.cx = +b.dataset.locX; S.view.cy = +b.dataset.locY;
+    S.view.scale = Math.max(S.view.scale, 20); draw(); });
+  $('listPoi').querySelectorAll('[data-tg-x]').forEach(b => b.onclick = () => {
+    S.target = { x:+b.dataset.tgX, y:+b.dataset.tgY }; syncFromState();
+    document.querySelector('.tab[data-mode="solve"]').click(); });
+}
+document.querySelectorAll('[data-pf]').forEach(b => b.addEventListener('click', () => {
+  poiFilter = b.dataset.pf;
+  document.querySelectorAll('[data-pf]').forEach(x => x.classList.toggle('on', x === b));
+  renderIntel();
+}));
+
+/* ---------- v3 建造面板 ---------- */
+function calcTotals(){
+  let units = 0, price = 0, kg = 0;
+  for (const [k, q] of Object.entries(S.calcQty)){
+    if (!q) continue;
+    const e = buildEntry(k); if (!e) continue;
+    units += e.s * q;
+    price += (e.price || 0) * q;
+    kg += (e.k === 'fob' ? 6.5 : e.s * UNIT_KG) * q;
+  }
+  return { units, price: price + units * UNIT_PRICE, kg };
+}
+function renderBuild(){
+  const qty = k => S.calcQty[k] || 0;
+  $('calcBody').innerHTML = BUILD_CATALOG.map(e => `
+    <tr><td>${e.n}${e.note ? `<div style="font:10.5px system-ui;color:var(--ink-3)">${e.note}</div>` : ''}</td>
+      <td>${e.s || '—'}</td><td>${e.tier}</td>
+      <td><button class="btn" data-qd="${e.k}" type="button" style="padding:3px 8px">−</button>
+        <b style="display:inline-block;min-width:26px;text-align:center">${qty(e.k)}</b>
+        <button class="btn" data-qu="${e.k}" type="button" style="padding:3px 8px">＋</button></td></tr>`).join('');
+  $('calcBody').querySelectorAll('[data-qu]').forEach(b => b.onclick = () => {
+    S.calcQty[b.dataset.qu] = qty(b.dataset.qu) + 1; renderBuild(); save(); });
+  $('calcBody').querySelectorAll('[data-qd]').forEach(b => b.onclick = () => {
+    S.calcQty[b.dataset.qd] = Math.max(0, qty(b.dataset.qd) - 1); renderBuild(); save(); });
+  const t = calcTotals();
+  $('calcTotal').textContent = fm0(t.units);
+  $('calcPallet').textContent = t.units ? Math.ceil(t.units / PALLET) : 0;
+  $('calcCost').textContent = '$' + fm0(t.price);
+  $('calcWeight').innerHTML = t.kg < 1 ? t.kg.toFixed(2) : fm0(t.kg) + '<small>kg</small>';
+  /* 规划器下拉 */
+  const sel = $('buildSel');
+  if (sel.options.length !== BUILD_CATALOG.length){
+    sel.innerHTML = BUILD_CATALOG.map(e =>
+      `<option value="${e.k}">${e.n}（${e.s} 建材${e.tier !== '—' ? ' · ' + e.tier + ' 锤' : ''}）</option>`).join('');
+  }
+  $('btnBuildArm').classList.toggle('on', !!S.buildArm);
+  $('btnBuildArm').textContent = S.buildArm ? '点地图放置…（再点取消）' : '⬇ 放到地图上';
+  $('listBuilds').innerHTML = S.builds.map(b => {
+    const e = buildEntry(b.k);
+    const bad = b.k !== 'fob' && !e.cat.includes('免') && nearestFobDist(b) > FOB_RADIUS;
+    return `<div class="li"><span class="nm" style="color:${b.k==='fob'?'#2b7cc9':bad?'#a3322c':'#1d4d35'}">${b.name}</span>
+      <span class="co">${fx(b.x)}, ${fx(b.y)}${bad ? ' · ⚠圈外' : ''}</span><span class="sp"></span>
+      <button class="btn" data-bloc="${b.id}" type="button">定位</button>
+      <button class="btn" data-bdel="${b.id}" type="button">删</button></div>`;
+  }).join('') || '<div class="li"><span class="co">还没有规划点：选好建筑 → 点「放到地图上」→ 在地图上落点</span></div>';
+  $('listBuilds').querySelectorAll('[data-bloc]').forEach(b => b.onclick = () => {
+    const it = S.builds.find(x => x.id === +b.dataset.bloc);
+    if (it){ S.view.cx = it.x; S.view.cy = it.y; S.view.scale = Math.max(S.view.scale, 25); draw(); } });
+  $('listBuilds').querySelectorAll('[data-bdel]').forEach(b => b.onclick = () => {
+    S.builds = S.builds.filter(x => x.id !== +b.dataset.bdel); renderBuild(); draw(); save(); });
+}
+$('btnBuildArm').onclick = () => {
+  S.buildArm = S.buildArm ? null : $('buildSel').value;
+  renderBuild();
+  $('hintText').textContent = S.buildArm ? '点击地图放置 ' + buildEntry(S.buildArm).n : MODE_HINT.build;
+};
+document.querySelectorAll('[data-bp]').forEach(b => b.addEventListener('click', () => {
+  S.calcQty = { ...(BUILD_PRESETS[b.dataset.bp]) }; renderBuild(); save();
+  flash('模板已载入，可继续微调数量');
+}));
+$('btnCalcClr').onclick = () => { S.calcQty = {}; renderBuild(); save(); };
+
+/* ---------- 射表 ---------- */
+function renderTable(){
+  const q = parseNum($('tblQ').value);
+  let bestI = -1, bestErr = 1e9;
+  if (q != null) TBL.forEach(([r, mil], i) => {
+    const e1 = Math.abs(r - q), e2 = Math.abs(mil - q);
+    const e = Math.min(e1, e2);
+    if (e < bestErr){ bestErr = e; bestI = i; }
+  });
+  $('tblBody').innerHTML = TBL.map(([r, mil], i) => `<tr class="${i===bestI?'cur':''}">
+    <td>${r}</td><td>${mil}</td>
+    <td>${i ? (mil - TBL[i-1][1] >= 0 ? '+' : '') + (mil - TBL[i-1][1]) : '—'}</td></tr>`).join('');
+  const cur = document.querySelector('#tblBody tr.cur');
+  if (cur) cur.scrollIntoView({ block:'center' });
+}
+$('tblQ').addEventListener('input', renderTable);
+$('btnTblClr').onclick = () => { $('tblQ').value = ''; renderTable(); };
+
+/* ---------- 设置 ---------- */
+function applyTheme(){
+  document.body.classList.toggle('dark', S.theme === 'dark');
+  $('btnTheme').textContent = S.theme === 'dark' ? '☀️ 浅色模式' : '🌙 夜间模式';
+  $('btnShowMarks').textContent = '自定义标记：' + (S.showMarks ? '开' : '关');
+}
+function renderSettings(){
+  applyTheme();
+  $('listHist').innerHTML = S.hist.map(h =>
+    `<div class="li"><span class="co" style="color:var(--ink-3)">${new Date(h.t).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})}</span>
+     <span class="nm" style="max-width:none;flex:1;font-weight:400">${h.map} · ${h.txt}</span></div>`).join('')
+    || '<div class="li"><span class="co">还没有记录。点「计算射击诸元」等按钮会自动记一笔。</span></div>';
+}
+$('btnTheme').onclick = () => { S.theme = S.theme === 'dark' ? 'light' : 'dark'; applyTheme(); save(); };
+$('btnShowMarks').onclick = () => { S.showMarks = !S.showMarks; applyTheme(); draw(); save(); };
+$('btnHistClr').onclick = () => { S.hist = []; renderSettings(); save(); };
+$('btnExport').onclick = () => {
+  $('ioBox').value = JSON.stringify({ version:4, exported:new Date().toISOString(), mapId:S.mapId,
+    mortar:S.mortar, target:S.target, impact:S.impact,
+    marks:S.marks, circles:S.circles, rays:S.rays, route:S.route, polys:S.polys,
+    builds:S.builds, calcQty:S.calcQty, hist:S.hist }, null, 1);
+  $('ioBox').select(); flash('已生成，Ctrl+C 复制保存');
+};
+$('btnImport').onclick = () => {
+  try {
+    const d = JSON.parse($('ioBox').value);
+    if (Array.isArray(d.marks))   S.marks   = d.marks;
+    if (Array.isArray(d.circles)) S.circles = d.circles;
+    if (Array.isArray(d.rays))    S.rays    = d.rays;
+    if (Array.isArray(d.hist))    S.hist    = d.hist;
+    if (d.route && Array.isArray(d.route.pts)) S.route = d.route;
+    if (Array.isArray(d.polys))   S.polys   = d.polys;
+    if (Array.isArray(d.builds))  S.builds  = d.builds;
+    if (d.calcQty && typeof d.calcQty === 'object') S.calcQty = d.calcQty;
+    if (d.mortar){ S.mortar = d.mortar; S.target = d.target || S.target; S.impact = d.impact || S.impact; syncFromState(); }
+    renderSettings(); draw(); run(); save(); flash('导入成功');
+  } catch(e){ flash('JSON 解析失败'); }
+};
+$('btnWipe').onclick = () => {
+  if (!confirm('确定清空全部本地数据（标记、圈、线、路线、区域、记录）？此操作不可恢复。')) return;
+  S.marks = []; S.circles = []; S.rays = []; S.hist = []; S.ruler = {a:null,b:null};
+  S.route = { pts:[] }; S.polys = []; S.polyDraft = null;
+  S.builds = []; S.calcQty = {}; S.buildArm = null;
+  renderBuild();
+  try { localStorage.removeItem('wardogs-mortar-map-v1'); } catch(e){}
+  renderSettings(); draw(); run(); flash('已清空');
+};
+
+/* ---------- 截图 / 标记显隐 ---------- */
+$('btnShot').onclick = () => {
+  try {
+    const a = document.createElement('a');
+    a.href = canvas.toDataURL('image/png');
+    a.download = `wardogs-${S.mapId}-${new Date().toISOString().slice(0,16).replace(/[:T]/g,'')}.png`;
+    a.click(); flash('已导出 PNG');
+  } catch(err){ flash('导出失败（跨域限制）：把底图切到「本地」或用 serve.cmd 打开再试'); }
+};
+$('btnMarks').onclick = () => { S.showMarks = !S.showMarks; applyTheme(); draw(); save(); };
+
+function listHtml(items, empty){
+  return items.join('') || empty || '';
+}
+
+function save(){
+  try { localStorage.setItem('wardogs-mortar-map-v1', JSON.stringify({
+    mortar:S.mortar, target:S.target, impact:S.impact, mode:S.mode, mapId:S.mapId,
+    az:$('paz').value, mil:$('pmil').value, rng:$('prng').value,
+    tool:S.tool, ruler:S.ruler, circles:S.circles, rays:S.rays,
+    marks:S.marks, showMarks:S.showMarks, theme:S.theme, hist:S.hist.slice(0,60), seq:S.seq,
+    route:S.route, polys:S.polys,
+    builds:S.builds, calcQty:S.calcQty
+  })); } catch(e){}
+}
+function load(){
+  try {
+    const sm = localStorage.getItem(SRC_KEY);
+    if (sm && SRC_TXT[sm]) S.srcMode = sm;
+    /* URL 参数可覆盖底图来源：?src=cdn|local|auto（桌面悬浮窗强制云端用） */
+    const qs = new URLSearchParams(location.search).get('src');
+    if (qs && SRC_TXT[qs]) S.srcMode = qs;
+    const d = JSON.parse(localStorage.getItem('wardogs-mortar-map-v1') || 'null');
+    if (!d) return;
+    S.mortar = d.mortar || null; S.target = d.target || null; S.impact = d.impact || null;
+    if (d.az) $('paz').value = d.az;
+    if (d.mil) $('pmil').value = d.mil;
+    if (d.rng) $('prng').value = d.rng;
+    if (d.mapId && MAPS[d.mapId]){
+      S.mapId = d.mapId;
+      mapBar.querySelectorAll('button').forEach(x => x.classList.toggle('on', x.dataset.map === d.mapId));
+    }
+    /* v2 工具箱状态 */
+    if (d.tool) S.tool = d.tool;
+    if (d.ruler) S.ruler = d.ruler;
+    if (Array.isArray(d.circles)) S.circles = d.circles;
+    if (Array.isArray(d.rays)) S.rays = d.rays;
+    if (Array.isArray(d.marks)) S.marks = d.marks;
+    if (d.showMarks != null) S.showMarks = d.showMarks;
+    if (d.theme) S.theme = d.theme;
+    if (Array.isArray(d.hist)) S.hist = d.hist;
+    if (d.route && Array.isArray(d.route.pts)) S.route = d.route;
+    if (Array.isArray(d.polys)) S.polys = d.polys;
+    if (Array.isArray(d.builds)) S.builds = d.builds;
+    if (d.calcQty && typeof d.calcQty === 'object') S.calcQty = d.calcQty;
+    if (d.seq) S.seq = d.seq;
+    if (d.mode && $('pane-'+d.mode)){
+      S.mode = d.mode;
+      document.querySelectorAll('.tab').forEach(x => x.classList.toggle('on', x.dataset.mode === d.mode));
+      document.querySelectorAll('.pane').forEach(x => x.classList.toggle('on', x.id === 'pane-'+d.mode));
+    }
+  } catch(e){}
+}
+
+document.querySelectorAll('input').forEach(i =>
+  i.addEventListener('input', () => { S.predPoint = null; run(); }));
+
+load();
+applyTheme();
+applySrcMode();
+resize();
+fitMap();
+if (S.mode === 'tools') renderToolPane();
+if (S.mode === 'intel') renderIntel();
+  if (S.mode === 'build') renderBuild();
+if (S.mode === 'table') renderTable();
+if (S.mode === 'settings') renderSettings();
+refreshPaneUI();
+draw();
+run();
+</script>
+</body>
+</html>

@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>WARDOGS · L81 迫击炮落点计算器</title>
+<style>
+  :root{
+    --bg:#f4f5f7;
+    --panel:#ffffff;
+    --line:#e2e5ea;
+    --line-strong:#c8cdd6;
+    --ink:#1c2024;
+    --ink-2:#5a6169;
+    --ink-3:#8b929b;
+    --accent:#2f6f4f;
+    --accent-soft:#e7f1eb;
+    --warn:#a8621a;
+    --warn-soft:#fdf1e3;
+    --bad:#a3322c;
+    --bad-soft:#fbeceb;
+    --grid:#e8eaee;
+    --grid-major:#d5d9df;
+    --mono:ui-monospace,"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--ink);
+    font:14px/1.55 system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1180px;margin:0 auto;padding:22px 18px 48px}
+  header.top{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:4px}
+  h1{font-size:19px;margin:0;letter-spacing:.2px}
+  h1 .tag{font:600 11px/1 var(--mono);color:var(--accent);background:var(--accent-soft);
+    padding:5px 7px;border-radius:5px;vertical-align:2px;margin-right:9px;letter-spacing:.6px}
+  .sub{color:var(--ink-3);font-size:12.5px}
+  main{display:grid;grid-template-columns:1.15fr .95fr;gap:16px;margin-top:16px;align-items:start}
+  @media (max-width:900px){main{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px}
+  .card>.hd{padding:10px 13px;border-bottom:1px solid var(--line);display:flex;
+    align-items:center;justify-content:space-between;gap:10px}
+  .card>.hd b{font-size:12.5px;letter-spacing:.4px;text-transform:uppercase;color:var(--ink-2)}
+  .card>.bd{padding:13px}
+
+  /* --- grid --- */
+  .gridbox{position:relative;background:#fbfcfd;border-radius:0 0 10px 10px;overflow:hidden}
+  svg#map{display:block;width:100%;height:auto;touch-action:none;cursor:crosshair}
+  .gr-hint{padding:8px 13px;border-top:1px solid var(--line);color:var(--ink-3);
+    font-size:11.5px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+  .gr-tools{display:flex;gap:6px;align-items:center}
+
+  /* --- controls --- */
+  .tabs{display:flex;gap:4px;padding:10px 10px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .tab{appearance:none;border:1px solid transparent;background:transparent;color:var(--ink-2);
+    font:inherit;font-size:13px;padding:7px 11px;border-radius:7px 7px 0 0;cursor:pointer}
+  .tab:hover{background:var(--bg)}
+  .tab.on{background:var(--panel);border-color:var(--line);border-bottom-color:var(--panel);
+    color:var(--ink);font-weight:600;margin-bottom:-1px}
+  .pane{display:none;padding:13px}
+  .pane.on{display:block}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  .fld{flex:1 1 118px;min-width:0}
+  .fld label{display:block;font-size:11.5px;color:var(--ink-3);margin-bottom:4px;letter-spacing:.3px}
+  input[type=text],input[type=number]{
+    width:100%;padding:8px 9px;border:1px solid var(--line-strong);border-radius:7px;
+    font:15px/1.2 var(--mono);color:var(--ink);background:#fff}
+  input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .paste{width:100%;padding:7px 9px;border:1px dashed var(--line-strong);border-radius:7px;
+    font:12.5px var(--mono);color:var(--ink-2);background:#fafbfc;margin-top:8px}
+  .paste::placeholder{color:var(--ink-3)}
+  button.btn{appearance:none;font:inherit;font-size:12.5px;padding:7px 11px;border-radius:7px;
+    border:1px solid var(--line-strong);background:#fff;color:var(--ink-2);cursor:pointer}
+  button.btn:hover{border-color:var(--ink-3);color:var(--ink)}
+  button.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+  button.btn.pri:hover{background:#275c42;color:#fff}
+  .sep{height:1px;background:var(--line);margin:13px 0}
+  .pick{display:flex;gap:4px;background:var(--bg);padding:3px;border-radius:8px}
+  .pick button{appearance:none;border:0;background:transparent;font:inherit;font-size:12px;
+    padding:5px 10px;border-radius:6px;cursor:pointer;color:var(--ink-2)}
+  .pick button.on{background:#fff;color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.07)}
+
+  /* --- result --- */
+  .readout{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:13px}
+  .ro{background:#fafbfc;border:1px solid var(--line);border-radius:9px;padding:10px 11px}
+  .ro .k{font-size:11px;color:var(--ink-3);letter-spacing:.4px}
+  .ro .v{font:600 25px/1.15 var(--mono);margin-top:3px;letter-spacing:-.4px}
+  .ro .v small{font-size:13px;font-weight:500;color:var(--ink-3);margin-left:3px;letter-spacing:0}
+  .ro.big{grid-column:1/-1;background:var(--accent-soft);border-color:#cfe3d7}
+  .ro.big .v{color:#1d4d35;font-size:32px}
+  .ro.bad{background:var(--bad-soft);border-color:#f0d3d1}
+  .ro.bad .v{color:var(--bad)}
+  .status{margin-top:11px;padding:9px 11px;border-radius:8px;font-size:12.5px;line-height:1.5}
+  .status.ok{background:var(--accent-soft);color:#1d4d35}
+  .status.warn{background:var(--warn-soft);color:#7c4712}
+  .status.bad{background:var(--bad-soft);color:#8a2721}
+  .cmd{margin-top:13px;background:#22282c;color:#e9edf0;border-radius:9px;padding:11px 12px;
+    font:13.5px/1.5 var(--mono);white-space:pre-wrap;word-break:break-word}
+  .cmd .lb{display:block;font:600 10.5px/1 var(--mono);letter-spacing:1px;color:#8fa0a8;margin-bottom:7px}
+  .kv{margin-top:11px;font-size:12.5px}
+  .kv div{display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-bottom:1px dashed var(--line)}
+  .kv div:last-child{border-bottom:0}
+  .kv span:last-child{font-family:var(--mono);color:var(--ink)}
+  .kv span:first-child{color:var(--ink-3)}
+  .muted{color:var(--ink-3);font-size:12.5px}
+  .notes{margin-top:16px;font-size:12.5px;color:var(--ink-2);line-height:1.65}
+  .notes b{color:var(--ink)}
+  .notes ol{margin:8px 0 0;padding-left:20px}
+  .notes li{margin:3px 0}
+  code{font:12.5px var(--mono);background:#eef0f3;padding:1.5px 5px;border-radius:4px}
+  .foot{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);
+    font-size:12px;color:var(--ink-3);line-height:1.6}
+  .foot a{color:var(--accent)}
+  .lp{cursor:pointer}
+  .lp:hover{fill:#000}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <h1><span class="tag">WARDOGS</span>L81 迫击炮落点计算器</h1>
+    <span class="sub">两点坐标 → 距离 / 方位 / 密位；或反向推算炮弹落点</span>
+  </header>
+
+  <main>
+    <!-- ================= LEFT : MAP ================= -->
+    <section class="card">
+      <div class="hd">
+        <b>战术网格 · 1 格 = 100 m</b>
+        <div class="gr-tools">
+          <span class="muted" id="zoomLabel">1.0×</span>
+          <button class="btn" id="btnFit" type="button">重置视图</button>
+        </div>
+      </div>
+      <div class="gridbox">
+        <svg id="map" viewBox="0 0 680 470" preserveAspectRatio="xMidYMid meet" role="img"
+             aria-label="坐标网格"></svg>
+      </div>
+      <div class="gr-hint">
+        <span id="hintText">点击网格放置点位 · 滚轮缩放 · 按住标记可拖动</span>
+        <span id="cursorCoord">X — / Y —</span>
+      </div>
+    </section>
+
+    <!-- ================= RIGHT : PANELS ================= -->
+    <section class="card">
+      <div class="tabs">
+        <button class="tab on" data-mode="solve" type="button">算诸元</button>
+        <button class="tab" data-mode="predict" type="button">推落点</button>
+        <button class="tab" data-mode="correct" type="button">修偏差</button>
+      </div>
+
+      <!-- ---------- SOLVE ---------- -->
+      <div class="pane on" id="pane-solve">
+        <div class="pick" id="pick-solve" style="margin-bottom:11px">
+          <button class="on" data-put="mortar" type="button">放炮位</button>
+          <button data-put="target" type="button">放目标</button>
+        </div>
+        <div class="row">
+          <div class="fld"><label>炮位 X</label><input type="text" id="mx" inputmode="decimal"></div>
+          <div class="fld"><label>炮位 Y</label><input type="text" id="my" inputmode="decimal"></div>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <div class="fld"><label>目标 X</label><input type="text" id="tx" inputmode="decimal"></div>
+          <div class="fld"><label>目标 Y</label><input type="text" id="ty" inputmode="decimal"></div>
+        </div>
+        <input class="paste" type="text" id="pIns" placeholder="把游戏里 Mark Coordinates 那行粘到这里，如 x83.64, y72.85">
+        <button class="btn pri" id="btnSolve" type="button" style="width:100%;margin-top:10px">计算射击诸元</button>
+        <div id="out-solve"></div>
+      </div>
+
+      <!-- ---------- PREDICT ---------- -->
+      <div class="pane" id="pane-predict">
+        <p class="muted" style="margin:0 0 11px">
+          给炮位 + 方位角 + 密位（或 RNG），算出炮弹落在哪个坐标。
+          也可以直接在网格上点一下目标位置，方位和距离会自动填上。
+        </p>
+        <div class="row">
+          <div class="fld"><label>炮位 X</label><input type="text" id="pmx" inputmode="decimal"></div>
+          <div class="fld"><label>炮位 Y</label><input type="text" id="pmy" inputmode="decimal"></div>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <div class="fld"><label>方位角 (° · 0=北 90=东)</label><input type="text" id="paz" inputmode="decimal"></div>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <div class="fld"><label>密位 MIL</label><input type="text" id="pmil" inputmode="decimal"></div>
+          <div class="fld"><label>或 RNG 距离 (m)</label><input type="text" id="prng" inputmode="decimal"></div>
+        </div>
+        <input class="paste" type="text" id="pIns2" placeholder="粘贴炮位坐标：x83.64, y72.85">
+        <button class="btn pri" id="btnPredict" type="button" style="width:100%;margin-top:10px">推算落点坐标</button>
+        <div id="out-predict"></div>
+      </div>
+
+      <!-- ---------- CORRECT ---------- -->
+      <div class="pane" id="pane-correct">
+        <p class="muted" style="margin:0 0 11px">
+          打完一发试射，把弹坑坐标填进来，得到"加/减多少米、左/右多少度"的修正量。
+        </p>
+        <div class="pick" id="pick-correct" style="margin-bottom:11px">
+          <button class="on" data-put="mortar" type="button">炮位</button>
+          <button data-put="target" type="button">目标</button>
+          <button data-put="impact" type="button">弹坑</button>
+        </div>
+        <div class="row">
+          <div class="fld"><label>炮位 X</label><input type="text" id="cmx" inputmode="decimal"></div>
+          <div class="fld"><label>炮位 Y</label><input type="text" id="cmy" inputmode="decimal"></div>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <div class="fld"><label>目标 X</label><input type="text" id="ctx" inputmode="decimal"></div>
+          <div class="fld"><label>目标 Y</label><input type="text" id="cty" inputmode="decimal"></div>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <div class="fld"><label>弹坑 X</label><input type="text" id="cix" inputmode="decimal"></div>
+          <div class="fld"><label>弹坑 Y</label><input type="text" id="ciy" inputmode="decimal"></div>
+        </div>
+        <button class="btn pri" id="btnCorrect" type="button" style="width:100%;margin-top:10px">计算修正量</button>
+        <div id="out-correct"></div>
+      </div>
+    </section>
+  </main>
+
+  <div class="notes card"><div class="bd">
+    <b>怎么用（游戏内操作）</b>
+    <ol>
+      <li>在战术地图上<b>右键自己的迫击炮 → Mark Coordinates</b>，把聊天里出现的那行坐标 <code>Ctrl+A / Ctrl+C</code> 复制，粘到上面的输入框。</li>
+      <li>对目标做同样的事（或中键点一下目标打个标记）。注意地图要<b>放到最大</b>再取坐标，缩得太小会丢小数位。</li>
+      <li>计算后读数：<b>方位角</b>是炮口要转的罗盘方位（0°=北，90°=东）；<b>RNG</b> 是左边那个距离滑杆；<b>密位 MIL</b> 是右边的仰角。</li>
+      <li>转到位、滑杆拨到位，开第一发试射，用弹坑再修一次基本就中了。</li>
+    </ol>
+    <div class="sep"></div>
+    <b>计算规则</b>：游戏坐标 1.00 = 100 m，所以 0.01 就是 1 m；Y 轴向北增大。
+    水平距离 = 100 × √(ΔX² + ΔY²)，方位角 = atan2(ΔX, ΔY)。
+    密位由 84 行社区射表线性插值得到——<b>L81 的规律是密位数值越大射程越短</b>（120 密位 ≈ 697 m，950 密位 ≈ 80 m），
+    有效区间 <b>132–684 m</b>，超出就打不到。
+  </div></div>
+
+  <div class="foot">
+    射表数据取自开源项目
+    <a href="https://github.com/apollyon-sys/wardogs-calculator" target="_blank" rel="noopener">apollyon-sys/wardogs-calculator</a>
+    （MIT 许可）。这是社区测量值，<b>不是 Bulkhead 官方发布的数据</b>，随版本更新可能失效。
+    计算假设炮位与目标等高，不处理地形起伏、建筑遮挡、风向和车辆倾斜。
+    另外 L81 本身有 50 MOA 的散布（685 m 处约 ±10 m），所以第一发永远是试射弹。
+  </div>
+
+</div>
+
+<script>
+/* ============================================================
+   L81 迫击炮射表（社区测量, [距离m, 密位]）
+   数据源: apollyon-sys/wardogs-calculator · data/weapons.json · MIT
+   ============================================================ */
+const TBL = [
+  [80,950],[87,940],[93,930],[99,920],[105,910],[110,900],[115,890],[118,880],[122,870],[127,860],
+  [132,850],[140,840],[151,830],[163,820],[175,810],[187,800],[198,790],[208,780],[219,770],[229,760],
+  [239,750],[250,740],[260,730],[270,720],[280,710],[290,700],[300,690],[310,680],[319,670],[329,660],
+  [339,650],[348,640],[358,630],[367,620],[376,610],[385,600],[394,590],[403,580],[412,570],[420,560],
+  [429,550],[437,540],[446,530],[454,520],[462,510],[470,500],[478,490],[486,480],[494,470],[501,460],
+  [509,450],[516,440],[524,430],[531,420],[538,410],[545,400],[552,390],[559,380],[565,370],[572,360],
+  [578,350],[585,340],[591,330],[597,320],[603,310],[609,300],[615,290],[620,280],[626,270],[631,260],
+  [636,250],[641,240],[646,230],[651,220],[656,210],[661,200],[666,190],[670,180],[675,170],[680,160],
+  [684,150],[688,140],[693,130],[697,120]
+];
+const MIN_R = 132, MAX_R = 684;      // 有效射程
+const MOA50 = Math.tan(50/60 * Math.PI/180); // 散布半角 tan(50 MOA)
+
+/* ---------- 弹道换算 ---------- */
+function rangeToMil(r){
+  const t = TBL;
+  if (r <= t[0][0]) return t[0][1];
+  if (r >= t[t.length-1][0]) return t[t.length-1][1];
+  for (let i=0;i<t.length-1;i++){
+    const [r1,m1]=t[i], [r2,m2]=t[i+1];
+    if (r <= r2) return m1 + (r-r1)*(m2-m1)/(r2-r1);
+  }
+  return t[t.length-1][1];
+}
+function milToRange(m){
+  const t = TBL;                       // 密位单调递减
+  if (m >= t[0][1]) return t[0][0];
+  if (m <= t[t.length-1][1]) return t[t.length-1][0];
+  for (let i=0;i<t.length-1;i++){
+    const [r1,m1]=t[i], [r2,m2]=t[i+1];
+    if (m >= m2) return r1 + (m-m1)*(r2-r1)/(m2-m1);
+  }
+  return t[t.length-1][0];
+}
+/* ---------- 几何 ---------- */
+function solveVector(dx, dy){          // dx,dy 单位: 地图坐标单位(100m)
+  const dist = 100 * Math.hypot(dx, dy);
+  let az = Math.atan2(dx, dy) * 180/Math.PI;   // 0=北(+Y), 90=东(+X)
+  az = (az + 360) % 360;
+  return {dist, az};
+}
+function unitToXY(mx, my, azDeg, distM){
+  const r = distM / 100, a = azDeg*Math.PI/180;
+  return { x: mx + r*Math.sin(a), y: my + r*Math.cos(a) };
+}
+/* ---------- 数字/格式 ---------- */
+const fx = v => (v==null || Number.isNaN(v)) ? '—' : v.toFixed(2);
+const fm0 = v => (v==null || Number.isNaN(v)) ? '—' : Math.round(v).toString();
+const faz = v => (v==null || Number.isNaN(v)) ? '—' :
+  String(Math.round(v) % 360).padStart(3,'0') + '°';
+const fd = v => (v==null || Number.isNaN(v)) ? '—' : Math.round(v) + ' m';
+
+function parseNum(s){
+  if (s==null) return null;
+  const m = String(s).replace(/[，、]/g,',').match(/-?\d+(?:\.\d+)?/);
+  if (!m) return null;
+  const v = parseFloat(m[0]);
+  return Number.isFinite(v) ? v : null;
+}
+/* 从 "x83.64, y72.85" 这类文本里扒出两个数 */
+function parsePair(s){
+  if (!s) return null;
+  const nums = String(s).replace(/[，、xXyY:：=]/g,' ').match(/-?\d+(?:\.\d+)?/g);
+  if (!nums || nums.length < 2) return null;
+  return { x: parseFloat(nums[0]), y: parseFloat(nums[1]) };
+}
+
+/* ============================================================
+   状态
+   ============================================================ */
+const S = {
+  mode:'solve',
+  mortar:null, target:null, impact:null,
+  put:'mortar',
+  view:{ cx:100, cy:100, span:16, zoom:1, panx:0, pany:0 },
+  manualView:false,
+  lastAz:null, curDist:null,
+  predPoint:null
+};
+
+/* ============================================================
+   画网格
+   ============================================================ */
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const svg = document.getElementById('map');
+const W = 680, H = 470, PAD = 34;
+
+function el(tag, attrs, parent){
+  const n = document.createElementNS(SVG_NS, tag);
+  for (const k in attrs) n.setAttribute(k, attrs[k]);
+  (parent||svg).appendChild(n);
+  return n;
+}
+function activePts(){
+  const a = [S.mortar];
+  if (S.mode === 'solve' || S.mode === 'correct') a.push(S.target);
+  if (S.mode === 'correct') a.push(S.impact);
+  if (S.mode === 'predict') a.push(S.predPoint);
+  return a.filter(Boolean);
+}
+function viewBounds(){
+  const pts = activePts();
+  let cx = 100, cy = 100, span = 16;
+  if (pts.length === 1){ cx = pts[0].x; cy = pts[0].y; span = 6; }
+  else if (pts.length > 1){
+    const xs = pts.map(p=>p.x), ys = pts.map(p=>p.y);
+    const x0 = Math.min(...xs), x1 = Math.max(...xs);
+    const y0 = Math.min(...ys), y1 = Math.max(...ys);
+    cx = (x0+x1)/2; cy = (y0+y1)/2;
+    span = Math.max(x1-x0, y1-y0) * 1.45 + 2;
+    span = Math.max(span, 3);
+  } else { cx = S.view.cx; cy = S.view.cy; span = S.view.span; }
+  if (S.manualView){ cx = S.view.cx; cy = S.view.cy; span = S.view.span; }
+  span = span / S.view.zoom;
+  const aspect = (W - PAD*2) / (H - PAD*2);   // 画布宽高比，撑满不拉伸
+  const vw = aspect > 1 ? span * aspect : span;
+  const vh = aspect > 1 ? span : span / aspect;
+  return { x0: cx - vw/2 + S.view.panx, x1: cx + vw/2 + S.view.panx,
+           y0: cy - vh/2 + S.view.pany, y1: cy + vh/2 + S.view.pany };
+}
+function niceStep(span){
+  const raw = span / 8;
+  const pow = Math.pow(10, Math.floor(Math.log10(raw)));
+  const n = raw / pow;
+  const mult = n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10;
+  return mult * pow;
+}
+function mkProj(b){
+  const sx = (W - PAD*2) / (b.x1 - b.x0);
+  const sy = (H - PAD*2) / (b.y1 - b.y0);
+  const s = Math.min(sx, sy);
+  const ox = (W - (b.x1-b.x0)*s)/2, oy = (H - (b.y1-b.y0)*s)/2;
+  return {
+    s, b,
+    X: x => ox + (x - b.x0)*s,
+    Y: y => H - oy - (y - b.y0)*s,      // Y 向北 = 向上
+    inv: (px,py) => ({ x: b.x0 + (px-ox)/s, y: b.y0 + (H-oy-py)/s })
+  };
+}
+
+let P = null;   // 当前投影：地图坐标 <-> 屏幕像素
+
+function computeP(){ P = mkProj(viewBounds()); return P; }
+
+function render(){
+  svg.innerHTML = '';
+  computeP();
+  drawGrid(P.b);
+  drawRings();
+  drawShapes();
+  document.getElementById('zoomLabel').textContent = S.view.zoom.toFixed(1) + '×';
+}
+
+function drawGrid(b){
+  const step = niceStep(Math.max(b.x1-b.x0, b.y1-b.y0));
+  // 背景
+  el('rect',{x:0,y:0,width:W,height:H,fill:'#fbfcfd'});
+  el('rect',{x:PAD,y:PAD,width:W-PAD*2,height:H-PAD*2,fill:'#fff',stroke:'#dfe3e9'});
+  const g0x = Math.ceil(b.x0/step)*step, g1x = Math.floor(b.x1/step)*step;
+  const g0y = Math.ceil(b.y0/step)*step, g1y = Math.floor(b.y1/step)*step;
+  for (let x=g0x; x<=g1x+1e-9; x+=step){
+    const px = P.X(x);
+    if (px < PAD-0.5 || px > W-PAD+0.5) continue;
+    el('line',{x1:px,y1:PAD,x2:px,y2:H-PAD,stroke:'#eceef2','stroke-width':1});
+    el('text',{x:px,y:H-PAD+15,'text-anchor':'middle',fill:'#9aa1aa','font-size':10.5,
+      'font-family':'ui-monospace,Consolas,monospace'}).textContent = x.toFixed(step<1?1:0);
+  }
+  for (let y=g0y; y<=g1y+1e-9; y+=step){
+    const py = P.Y(y);
+    if (py < PAD-0.5 || py > H-PAD+0.5) continue;
+    el('line',{x1:PAD,y1:py,x2:W-PAD,y2:py,stroke:'#eceef2','stroke-width':1});
+    el('text',{x:PAD-7,y:py+3.5,'text-anchor':'end',fill:'#9aa1aa','font-size':10.5,
+      'font-family':'ui-monospace,Consolas,monospace'}).textContent = y.toFixed(step<1?1:0);
+  }
+  // 罗盘
+  el('text',{x:W-22,y:PAD+16,'text-anchor':'middle',fill:'#8b929b','font-size':11.5,
+    'font-weight':600}).textContent = 'N';
+  el('line',{x1:W-22,y1:PAD+22,x2:W-22,y2:PAD+34,stroke:'#b9c0c8','stroke-width':1.5});
+}
+
+function drawRings(){
+  if (!S.mortar) return;
+  const cx = P.X(S.mortar.x), cy = P.Y(S.mortar.y);
+  const rMax = (MAX_R/100) * P.s, rMin = (MIN_R/100) * P.s;
+  el('circle',{cx,cy,r:rMax,fill:'none',stroke:'#2f6f4f','stroke-width':1.2,
+    'stroke-dasharray':'6 5','opacity':.5});
+  el('circle',{cx,cy,r:rMin,fill:'none',stroke:'#a3322c','stroke-width':1.2,
+    'stroke-dasharray':'3 4','opacity':.5});
+  if (rMax > 30){
+    el('text',{x:cx+rMax+4,y:cy+4,fill:'#2f6f4f','font-size':10.5,'opacity':.85})
+      .textContent = '684 m';
+  }
+}
+
+function marker(pt, color, label, sub){
+  const x = P.X(pt.x), y = P.Y(pt.y);
+  const g = el('g',{'class':'lp','data-role':label,style:'cursor:grab'});
+  el('circle',{cx:x,cy:y,r:6.5,fill:'#fff',stroke:color,'stroke-width':2.4},g);
+  el('circle',{cx:x,cy:y,r:2.2,fill:color},g);
+  const t = el('text',{x:x+11,y:y-7,fill:color,'font-size':11.5,'font-weight':600},g);
+  t.textContent = label;
+  if (sub){
+    const t2 = el('text',{x:x+11,y:y+6,fill:'#8b929b','font-size':10.5,
+      'font-family':'ui-monospace,Consolas,monospace'},g);
+    t2.textContent = sub;
+  }
+  return g;
+}
+
+function drawShapes(){
+  /* 每个模式只画与自己相关的点，避免上一步的弹坑/目标残留干扰读图 */
+  const show = {
+    target:  S.mode === 'solve'   || S.mode === 'correct',
+    impact:  S.mode === 'correct',
+    predict: S.mode === 'predict'
+  };
+  const pts = [];
+  if (S.mortar) pts.push({p:S.mortar, c:'#2f6f4f', l:'炮位', s:fx(S.mortar.x)+', '+fx(S.mortar.y)});
+  if (show.target && S.target) pts.push({p:S.target, c:'#a3322c', l:'目标', s:fx(S.target.x)+', '+fx(S.target.y)});
+  if (show.impact && S.impact) pts.push({p:S.impact, c:'#a8621a', l:'弹坑', s:fx(S.impact.x)+', '+fx(S.impact.y)});
+  if (show.predict && S.predPoint) pts.push({p:S.predPoint, c:'#2a5f9e', l:'落点', s:fx(S.predPoint.x)+', '+fx(S.predPoint.y)});
+
+  const lineTo = (a,b,color,dash) => {
+    if (!a || !b) return;
+    el('line',{x1:P.X(a.x),y1:P.Y(a.y),x2:P.X(b.x),y2:P.Y(b.y),
+      stroke:color,'stroke-width':1.7,'stroke-dasharray':dash});
+  };
+  if (S.mortar && show.target && S.target) lineTo(S.mortar,S.target,'#2f6f4f','7 4');
+  if (S.mortar && show.impact && S.impact) lineTo(S.mortar,S.impact,'#a8621a','4 4');
+  if (S.mortar && show.predict && S.predPoint) lineTo(S.mortar,S.predPoint,'#2a5f9e','7 4');
+
+  // 炮位→目标的距离标注（只在算诸元模式下有意义）
+  if (S.mode === 'solve' && S.mortar && S.target){
+    const {dist, az} = solveVector(S.target.x-S.mortar.x, S.target.y-S.mortar.y);
+    const mx = (P.X(S.mortar.x)+P.X(S.target.x))/2, my = (P.Y(S.mortar.y)+P.Y(S.target.y))/2;
+    const w = 92, h = 19;
+    el('rect',{x:mx-w/2,y:my-h/2,width:w,height:h,rx:5,fill:'#1c2024',opacity:.86});
+    el('text',{x:mx,y:my+4.5,'text-anchor':'middle',fill:'#fff','font-size':11.5,
+      'font-family':'ui-monospace,Consolas,monospace'}).textContent =
+      Math.round(dist)+' m / '+faz(az);
+  }
+  pts.forEach(o => marker(o.p, o.c, o.l, o.s));
+}
+
+/* 把某一帧的视野固定下来（之后不再自动适配） */
+function lockViewTo(b){
+  S.view.cx = (b.x0+b.x1)/2; S.view.cy = (b.y0+b.y1)/2;
+  S.view.span = Math.min(b.x1-b.x0, b.y1-b.y0);
+  S.view.zoom = 1; S.view.panx = 0; S.view.pany = 0;
+  S.manualView = true;
+}
+function freezeView(){ if (!S.manualView) lockViewTo(viewBounds()); }
+function fitsIn(b, pts, margin){
+  const dx = (b.x1-b.x0)*margin, dy = (b.y1-b.y0)*margin;
+  return pts.filter(Boolean).every(p =>
+    p.x >= b.x0+dx && p.x <= b.x1-dx && p.y >= b.y0+dy && p.y <= b.y1-dy);
+}
+/* 放一个新点后：旧视野还装得下就保持不动，装不下才允许重新适配 */
+function keepOrRefit(before, after){
+  if (S.manualView) return;
+  if (fitsIn(before, after, 0.1)) lockViewTo(before);
+}
+function svgPoint(evt){
+  const r = svg.getBoundingClientRect();
+  const px = (evt.clientX - r.left) * (W / r.width);
+  const py = (evt.clientY - r.top) * (H / r.height);
+  return P ? P.inv(px, py) : null;
+}
+function clampCoord(p){
+  return { x: Math.round(Math.max(0, Math.min(163.84, p.x))*100)/100,
+           y: Math.round(Math.max(0, Math.min(163.84, p.y))*100)/100 };
+}
+
+function markerRole(target){
+  const g = target && target.closest ? target.closest('g[data-role]') : null;
+  return g ? g.getAttribute('data-role') : null;
+}
+let drag = null;
+svg.addEventListener('pointerdown', e => {
+  const role = markerRole(e.target);
+  if (!role) return;
+  if (role === '落点') return;            // 落点由参数算出，不可拖
+  freezeView();                           // 拖之前先把视野钉住
+  drag = role; svg.setPointerCapture(e.pointerId); e.preventDefault();
+});
+svg.addEventListener('pointermove', e => {
+  const p = svgPoint(e);
+  if (!p) return;
+  document.getElementById('cursorCoord').textContent = 'X ' + fx(p.x) + ' / Y ' + fx(p.y);
+  if (!drag) return;
+  const c = clampCoord(p);
+  if (drag === '炮位'){ S.mortar = c; syncFromState(); run(); }
+  else if (drag === '目标'){ S.target = c; syncFromState(); run(); }
+  else if (drag === '弹坑'){ S.impact = c; syncFromState(); run(); }
+});
+['pointerup','pointercancel','pointerleave'].forEach(ev =>
+  svg.addEventListener(ev, () => { drag = null; }));
+
+svg.addEventListener('click', e => {
+  if (markerRole(e.target)) return;
+  const p = svgPoint(e); if (!p) return;
+  const c = clampCoord(p);
+  const before = viewBounds();            // 放点前的视野
+  const snap = () => keepOrRefit(before, activePts());
+
+  if (S.mode === 'predict'){
+    if (!S.mortar){ S.mortar = c; snap(); syncFromState(); run(); return; }
+    const {dist, az} = solveVector(c.x - S.mortar.x, c.y - S.mortar.y);
+    document.getElementById('paz').value = az.toFixed(1);
+    document.getElementById('prng').value = Math.round(dist);
+    document.getElementById('pmil').value = '';
+    run();
+    return;
+  }
+  const put = S.put;
+  if (put === 'mortar') S.mortar = c;
+  else if (put === 'target') S.target = c;
+  else if (put === 'impact') S.impact = c;
+  snap(); syncFromState(); run();
+});
+
+let wheelLock = 0;
+svg.addEventListener('wheel', e => {
+  e.preventDefault();
+  const now = Date.now(); if (now - wheelLock < 50) return; wheelLock = now;
+  const anchor = svgPoint(e);            // 光标下的地图坐标，缩放后要保持不动
+  freezeView();
+  S.view.zoom = Math.max(0.5, Math.min(16, S.view.zoom * (e.deltaY < 0 ? 1.2 : 1/1.2)));
+  computeP();                            // 用新视野重算投影，再量一次
+  const after = svgPoint(e);
+  if (anchor && after){
+    S.view.panx += after.x - anchor.x;
+    S.view.pany += after.y - anchor.y;
+  }
+  render();
+}, {passive:false});
+
+let panning = null;
+svg.addEventListener('pointerdown', e => {
+  if (drag || markerRole(e.target)) return;
+  if (e.button !== 1 && e.button !== 2 && !e.shiftKey) return;
+  freezeView();
+  panning = svgPoint(e); e.preventDefault();
+});
+svg.addEventListener('pointermove', e => {
+  if (!panning) return;
+  const p = svgPoint(e); if (!p) return;
+  S.view.panx += (panning.x - p.x); S.view.pany += (panning.y - p.y);
+  panning = p; render();
+});
+svg.addEventListener('pointerup', () => { panning = null; });
+svg.addEventListener('pointercancel', () => { panning = null; });
+svg.addEventListener('contextmenu', e => e.preventDefault());
+document.getElementById('btnFit').addEventListener('click', () => {
+  S.manualView = false; S.view.zoom = 1; S.view.panx = 0; S.view.pany = 0; render();
+});
+
+/* ============================================================
+   面板联动
+   ============================================================ */
+const $ = id => document.getElementById(id);
+
+function setMode(mode, opts){
+  S.mode = mode;
+  document.querySelectorAll('.tab').forEach(x => x.classList.toggle('on', x.dataset.mode === mode));
+  document.querySelectorAll('.pane').forEach(x => x.classList.toggle('on', x.id === 'pane-' + mode));
+  if (!opts || !opts.keepView){
+    S.manualView = false; S.view.zoom = 1; S.view.panx = 0; S.view.pany = 0;
+  }
+  S.predPoint = null;
+  S.put = 'mortar';
+  const pk = document.querySelector('#pick-' + mode + ' button[data-put="mortar"]');
+  if (pk) pk.parentNode.querySelectorAll('button').forEach(b => b.classList.toggle('on', b === pk));
+  updateHint();
+}
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+  setMode(t.dataset.mode);
+  syncFromState();
+  run();
+}));
+document.querySelectorAll('.pick').forEach(pk => pk.querySelectorAll('button')
+  .forEach(b => b.addEventListener('click', () => {
+    pk.querySelectorAll('button').forEach(x => x.classList.remove('on'));
+    b.classList.add('on'); S.put = b.dataset.put;
+    updateHint();
+  })));
+
+function updateHint(){
+  const h = $('hintText');
+  if (S.mode === 'predict') h.textContent = S.mortar ? '再点一下就设置目标方向（自动算方位和距离）' : '先点一下放炮位';
+  else if (S.put === 'mortar') h.textContent = '点击网格放置炮位';
+  else if (S.put === 'target') h.textContent = '点击网格放置目标';
+  else h.textContent = '点击网格放置弹坑位置';
+}
+
+function syncFromState(){
+  if (S.mortar){
+    $('mx').value = fx(S.mortar.x); $('my').value = fx(S.mortar.y);
+    $('pmx').value = fx(S.mortar.x); $('pmy').value = fx(S.mortar.y);
+    $('cmx').value = fx(S.mortar.x); $('cmy').value = fx(S.mortar.y);
+  }
+  if (S.target){
+    $('tx').value = fx(S.target.x); $('ty').value = fx(S.target.y);
+    $('ctx').value = fx(S.target.x); $('cty').value = fx(S.target.y);
+  }
+  if (S.impact){
+    $('cix').value = fx(S.impact.x); $('ciy').value = fx(S.impact.y);
+  }
+  updateHint();
+}
+function readStateFromInputs(){
+  const g = (x,y) => {
+    const a = parseNum($(x).value), b = parseNum($(y).value);
+    return (a==null || b==null) ? null : {x:a, y:b};
+  };
+  if (S.mode === 'solve'){ S.mortar = g('mx','my'); S.target = g('tx','ty'); }
+  else if (S.mode === 'predict'){ S.mortar = g('pmx','pmy'); }
+  else { S.mortar = g('cmx','cmy'); S.target = g('ctx','cty'); S.impact = g('cix','ciy'); }
+}
+
+/* ---------- 粘贴解析 ---------- */
+[['pIns','mx','my','solve'],['pIns2','pmx','pmy','predict']].forEach(([id,x,y])=>{
+  $(id).addEventListener('input', () => {
+    const pr = parsePair($(id).value);
+    if (!pr) return;
+    $(x).value = fx(pr.x); $(y).value = fx(pr.y);
+    run();
+  });
+});
+
+/* ---------- 密位 / RNG 二选一 ---------- */
+$('pmil').addEventListener('input', () => { if ($('pmil').value.trim()) $('prng').value = ''; });
+$('prng').addEventListener('input', () => { if ($('prng').value.trim()) $('pmil').value = ''; });
+
+/* ============================================================
+   主逻辑
+   ============================================================ */
+function run(){
+  readStateFromInputs();
+  if (S.mode === 'solve') doSolve();
+  if (S.mode === 'predict') doPredict();
+  if (S.mode === 'correct') doCorrect();
+  render();
+  save();
+}
+
+function doSolve(){
+  const o = $('out-solve');
+  const {mortar, target} = S;
+  if (!mortar || !target){
+    o.innerHTML = '<div class="status warn">把炮位和目标的 X / Y 都填上，或者在左边网格上点两下。</div>';
+    return;
+  }
+  const {dist, az} = solveVector(target.x-mortar.x, target.y-mortar.y);
+  const mil = rangeToMil(dist);
+  const milR = Math.round(mil);
+  const distAtMil = milToRange(milR);
+  const spread = dist * MOA50;
+  const inRange = dist >= MIN_R && dist <= MAX_R;
+
+  let stCls = 'ok', stTxt = '';
+  if (dist < MIN_R) { stCls='bad'; stTxt = `太近了——低于 L81 最小射程 ${MIN_R} m，这一发打不出去（最近约 80 m 才有对应密位，但射表有效区间从 ${MIN_R} m 起）。把炮位往回挪。`; }
+  else if (dist > MAX_R) { stCls='bad'; stTxt = `太远了——超出 L81 最大射程 ${MAX_R} m 约 ${Math.round(dist-MAX_R)} m。往前推炮位，或者换 SPH-2 自行火炮。`; }
+  else if (dist > MAX_R - 40) { stCls='warn'; stTxt = `已经贴近最大射程（${MAX_R} m），落点对滑杆误差非常敏感，而且密位随距离变化极快。能挪近一点就挪近一点。`; }
+  else stTxt = `目标在有效射程内（${MIN_R}–${MAX_R} m）。表内插值密位 ${mil.toFixed(1)}，滑杆步进到整密位 ${milR} → 对应 ${Math.round(distAtMil)} m。`;
+
+  const dz = [];
+  if (Math.round(dist) !== Math.round(distAtMil))
+    dz.push(`密位取整后实际射程 ${Math.round(distAtMil)} m，与目标差 ${Math.round(distAtMil-dist) > 0 ? '+' : ''}${Math.round(distAtMil-dist)} m`);
+
+  S.curDist = dist; S.lastAz = az;
+
+  o.innerHTML = `
+    <div class="readout">
+      <div class="ro big"><div class="k">密位 MIL（右边仰角）</div>
+        <div class="v">${fm0(milR)}<small>密位</small></div></div>
+      <div class="ro"><div class="k">RNG 距离（左边滑杆）</div>
+        <div class="v">${fm0(dist)}<small>m</small></div></div>
+      <div class="ro"><div class="k">方位角 AZIMUTH</div>
+        <div class="v">${faz(az)}</div></div>
+    </div>
+    <div class="cmd"><span class="lb">射击口令</span>方位 ${faz(az)}，距离 ${fm0(dist)}，密位 ${fm0(milR)}</div>
+    <div class="status ${stCls}">${stTxt}</div>
+    ${dz.length ? '<div class="status warn">' + dz.join('；') + '。</div>' : ''}
+    <div class="kv">
+      <div><span>ΔX / ΔY（坐标单位）</span><span>${(target.x-mortar.x).toFixed(2)} / ${(target.y-mortar.y).toFixed(2)}</span></div>
+      <div><span>精确距离</span><span>${dist.toFixed(1)} m</span></div>
+      <div><span>精确密位（未取整）</span><span>${mil.toFixed(1)}</span></div>
+      <div><span>取整密位对应射程</span><span>${Math.round(distAtMil)} m</span></div>
+      <div><span>50 MOA 散布</span><span>± ${spread.toFixed(1)} m</span></div>
+      <div><span>相对炮位方向</span><span>${dirWord(az)}</span></div>
+    </div>
+    <div style="margin-top:11px"><button class="btn" id="cp1" type="button">复制射击口令</button></div>`;
+  $('cp1').onclick = () => copy(`方位 ${faz(az)}，距离 ${fm0(dist)}，密位 ${fm0(milR)}`);
+}
+
+function doPredict(){
+  const o = $('out-predict');
+  const mortar = S.mortar;
+  const azIn = parseNum($('paz').value);
+  const milIn = parseNum($('pmil').value);
+  const rngIn = parseNum($('prng').value);
+
+  if (!mortar){
+    S.predPoint = null;
+    o.innerHTML = '<div class="status warn">先填炮位坐标，或者在网格上点一下放炮位。</div>';
+    return;
+  }
+  if (azIn == null){ S.predPoint = null;
+    o.innerHTML = '<div class="status warn">填一个方位角（0–360，0=北 90=东）。</div>'; return; }
+  if (milIn == null && rngIn == null){
+    S.predPoint = null;
+    o.innerHTML = '<div class="status warn">密位和 RNG 至少填一个（两个都填时以密位为准）。</div>'; return; }
+
+  let dist, srcTxt;
+  if (milIn != null){
+    dist = milToRange(milIn);
+    srcTxt = `由密位 ${fm0(milIn)} 反查射表`;
+  } else {
+    dist = rngIn;
+    srcTxt = `由 RNG 距离直接给出`;
+  }
+  const pt = unitToXY(mortar.x, mortar.y, azIn, dist);
+  const clX = Math.max(0, Math.min(163.84, pt.x));
+  const clY = Math.max(0, Math.min(163.84, pt.y));
+  const off = Math.abs(clX - pt.x) > 1e-9 || Math.abs(clY - pt.y) > 1e-9;  // 只判截断，不算四舍五入
+  const c = { x: Math.round(clX*100)/100, y: Math.round(clY*100)/100 };
+  S.predPoint = c;
+  const milBack = rangeToMil(dist);
+  const spread = dist * MOA50;
+
+  let stCls = 'ok', stTxt = '';
+  if (dist < MIN_R){ stCls='bad'; stTxt = `射程 ${Math.round(dist)} m 低于最小射程 ${MIN_R} m，打不到。`; }
+  else if (dist > MAX_R + 13){ stCls='bad'; stTxt = `射程 ${Math.round(dist)} m 超出射表上限，炮弹会在更近处落地。`; }
+  else if (dist > MAX_R){ stCls='warn'; stTxt = `射程 ${Math.round(dist)} m 略超 ${MAX_R} m，已用射表端点外推，实际会打短。`; }
+  else stTxt = `落点如下，${srcTxt}。`;
+
+  S.lastAz = azIn; S.curDist = dist;
+
+  o.innerHTML = `
+    <div class="readout">
+      <div class="ro big"><div class="k">预测落点 X / Y</div>
+        <div class="v">${fx(c.x)} <small>,</small> ${fx(c.y)}</div></div>
+      <div class="ro"><div class="k">射程</div><div class="v">${fm0(dist)}<small>m</small></div></div>
+      <div class="ro"><div class="k">对应密位</div><div class="v">${fm0(milBack)}</div></div>
+    </div>
+    <div class="status ${stCls}">${stTxt}${off ? '（原始落点超出了 0–163.84 的地图边界，已截断显示）' : ''}</div>
+    <div class="kv">
+      <div><span>方位角</span><span>${faz(azIn)}</span></div>
+      <div><span>落点相对炮位偏移</span><span>ΔX ${(c.x-mortar.x).toFixed(2)} / ΔY ${(c.y-mortar.y).toFixed(2)}</span></div>
+      <div><span>50 MOA 散布</span><span>± ${spread.toFixed(1)} m</span></div>
+    </div>
+    <div class="muted" style="margin-top:10px">把弹坑填到"修偏差"里，就能得到下一发的修正量。</div>`;
+}
+
+function doCorrect(){
+  const o = $('out-correct');
+  const {mortar, target, impact} = S;
+  if (!mortar || !impact){
+    o.innerHTML = '<div class="status warn">填上炮位和弹坑坐标（目标可以留空）。</div>'; return;
+  }
+  const imp = solveVector(impact.x-mortar.x, impact.y-mortar.y);
+  let html = '';
+
+  if (target){
+    const tgt = solveVector(target.x-mortar.x, target.y-mortar.y);
+    let dAz = tgt.az - imp.az;
+    while (dAz > 180) dAz -= 360;
+    while (dAz < -180) dAz += 360;
+    const dR = tgt.dist - imp.dist;
+    const newMil = Math.round(rangeToMil(tgt.dist));
+    const newAz = tgt.az;
+
+    const drTxt = Math.abs(dR) < 2 ? '距离基本对，只要修方向'
+      : (dR > 0 ? `打短了 ${Math.round(dR)} m → 要<b>加距离</b>` : `打远了 ${Math.round(-dR)} m → 要<b>减距离</b>`);
+    const daTxt = Math.abs(dAz) < 0.5 ? '方向基本对'
+      : (dAz > 0 ? `偏左 ${Math.abs(dAz).toFixed(1)}° → 往<b>右</b>转` : `偏右 ${Math.abs(dAz).toFixed(1)}° → 往<b>左</b>转`);
+
+    html += `
+      <div class="readout">
+        <div class="ro big"><div class="k">修正后密位 / 方位</div>
+          <div class="v">${fm0(newMil)} <small>密位 /</small> ${faz(newAz)}</div></div>
+        <div class="ro"><div class="k">距离修正</div>
+          <div class="v">${dR >= 0 ? '+' : ''}${Math.round(dR)}<small>m</small></div></div>
+        <div class="ro"><div class="k">方向修正</div>
+          <div class="v">${dAz >= 0 ? '+' : ''}${dAz.toFixed(1)}<small>°</small></div></div>
+      </div>
+      <div class="cmd"><span class="lb">修正口令</span>加${Math.abs(Math.round(dR))}米 or 减${Math.abs(Math.round(dR))}米 · 左/右 ${Math.abs(dAz).toFixed(1)}°
+方位 ${faz(newAz)}，距离 ${fm0(tgt.dist)}，密位 ${fm0(newMil)}</div>
+      <div class="status ok">${drTxt}；${daTxt}。注意 L81 上<b>密位调小 = 打得更远</b>，密位调大 = 打得更近。</div>
+      <div class="kv">
+        <div><span>目标距离 / 方位</span><span>${Math.round(tgt.dist)} m / ${faz(tgt.az)}</span></div>
+        <div><span>弹坑距离 / 方位</span><span>${Math.round(imp.dist)} m / ${faz(imp.az)}</span></div>
+        <div><span>落点偏差（直线）</span><span>${Math.round(Math.hypot(target.x-impact.x, target.y-impact.y)*100)} m</span></div>
+      </div>`;
+  } else {
+    const newMil = Math.round(rangeToMil(imp.dist));
+    html += `
+      <div class="readout">
+        <div class="ro big"><div class="k">弹坑相对炮位</div>
+          <div class="v">${Math.round(imp.dist)}<small>m /</small> ${faz(imp.az)}</div></div>
+        <div class="ro"><div class="k">该射程对应密位</div><div class="v">${fm0(newMil)}</div></div>
+        <div class="ro"><div class="k">50 MOA 散布</div><div class="v">± ${(imp.dist*MOA50).toFixed(1)}<small>m</small></div></div>
+      </div>
+      <div class="status warn">没有目标坐标，只能核对弹坑落点。填上目标坐标才是真正的修正量。</div>`;
+  }
+  o.innerHTML = html;
+}
+
+function dirWord(az){
+  const w = ['北','东北','东','东南','南','西南','西','西北'];
+  return w[Math.round(((az%360)+360)%360 / 45) % 8];
+}
+function copy(txt){
+  const done = () => flash('已复制');
+  if (navigator.clipboard) navigator.clipboard.writeText(txt).then(done, () => fallback());
+  else fallback();
+  function fallback(){
+    const ta = document.createElement('textarea');
+    ta.value = txt; document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); done(); } catch(e){}
+    document.body.removeChild(ta);
+  }
+}
+let flashT = 0;
+function flash(msg){
+  const d = document.createElement('div');
+  d.textContent = msg;
+  d.style.cssText = 'position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#1c2024;'+
+    'color:#fff;font:12.5px system-ui;padding:8px 14px;border-radius:7px;z-index:99;opacity:.95';
+  document.body.appendChild(d);
+  clearTimeout(flashT); flashT = setTimeout(() => d.remove(), 1400);
+}
+
+/* ---------- 记忆 ---------- */
+function save(){
+  try {
+    localStorage.setItem('wardogs-mortar-v1', JSON.stringify({
+      mortar:S.mortar, target:S.target, impact:S.impact, mode:S.mode,
+      az:$('paz').value, mil:$('pmil').value, rng:$('prng').value
+    }));
+  } catch(e){}
+}
+function load(){
+  try {
+    const d = JSON.parse(localStorage.getItem('wardogs-mortar-v1') || 'null');
+    if (!d) return;
+    S.mortar = d.mortar || null; S.target = d.target || null; S.impact = d.impact || null;
+    if (d.az) $('paz').value = d.az;
+    if (d.mil) $('pmil').value = d.mil;
+    if (d.rng) $('prng').value = d.rng;
+    setMode(d.mode || 'solve', {keepView:true});
+  } catch(e){}
+}
+
+/* ---------- 启动 ---------- */
+document.querySelectorAll('input').forEach(i =>
+  i.addEventListener('input', () => { S.predPoint = null; run(); }));
+load();
+syncFromState();
+run();
+</script>
+</body>
+</html>
