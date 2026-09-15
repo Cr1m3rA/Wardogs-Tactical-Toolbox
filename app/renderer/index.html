@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WARDOGS 战术工具箱</title>
+  <link rel="stylesheet" href="vendor/shoelace/themes/light.css">
+  <link rel="stylesheet" href="vendor/shoelace/themes/dark.css">
+  <link rel="stylesheet" href="app.css">
+  <!-- Shoelace npm 版使用裸模块名导入运行时依赖，import map 本地解析（离线可用） -->
+  <script type="importmap">
+  {
+    "imports": {
+      "lit": "./vendor/npm/lit/index.js",
+      "lit/": "./vendor/npm/lit/",
+      "lit-element": "./vendor/npm/lit-element/lit-element.js",
+      "lit-element/": "./vendor/npm/lit-element/",
+      "lit-html": "./vendor/npm/lit-html/lit-html.js",
+      "lit-html/": "./vendor/npm/lit-html/",
+      "@lit/reactive-element": "./vendor/npm/@lit/reactive-element/reactive-element.js",
+      "@lit/reactive-element/": "./vendor/npm/@lit/reactive-element/",
+      "@lit/react": "./vendor/npm/@lit/react/index.js",
+      "@lit/react/": "./vendor/npm/@lit/react/",
+      "@shoelace-style/animations": "./vendor/npm/@shoelace-style/animations/dist/index.js",
+      "@shoelace-style/animations/": "./vendor/npm/@shoelace-style/animations/",
+      "@shoelace-style/localize": "./vendor/npm/@shoelace-style/localize/dist/index.js",
+      "@shoelace-style/localize/": "./vendor/npm/@shoelace-style/localize/",
+      "@ctrl/tinycolor": "./vendor/npm/@ctrl/tinycolor/dist/public_api.js",
+      "@ctrl/tinycolor/": "./vendor/npm/@ctrl/tinycolor/",
+      "@floating-ui/dom": "./vendor/npm/@floating-ui/dom/dist/floating-ui.dom.mjs",
+      "@floating-ui/core": "./vendor/npm/@floating-ui/core/dist/floating-ui.core.mjs",
+      "@floating-ui/utils": "./vendor/npm/@floating-ui/utils/dist/floating-ui.utils.mjs",
+      "@floating-ui/utils/dom": "./vendor/npm/@floating-ui/utils/dist/floating-ui.utils.dom.mjs",
+      "composed-offset-position": "./vendor/npm/composed-offset-position/dist/composed-offset-position.esm.js",
+      "composed-offset-position/": "./vendor/npm/composed-offset-position/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="app">
+    <aside id="sidebar">
+      <div class="brand">
+        <span class="logo">W</span>
+        <div class="brand-txt"><b>WARDOGS</b><small>战术工具箱</small></div>
+      </div>
+      <nav id="nav" aria-label="功能导航"></nav>
+      <div class="side-foot">
+        <div class="mono" id="cursorCoord">X — / Y —</div>
+        <div id="tileStat" class="tile-stat">底图检测中…</div>
+      </div>
+    </aside>
+
+    <div id="main">
+      <header id="topbar">
+        <sl-select id="mapSel" size="small" hoist></sl-select>
+        <sl-select id="srcSel" size="small" hoist style="width:118px"></sl-select>
+        <span class="tb-sep"></span>
+        <sl-tooltip content="网格开/关"><sl-button id="btnGrid" size="small" class="tb-btn">▦</sl-button></sl-tooltip>
+        <sl-tooltip content="地标注隐"><sl-button id="btnPoi" size="small" class="tb-btn">◈</sl-button></sl-tooltip>
+        <sl-tooltip content="自定义标记显隐"><sl-button id="btnMarks" size="small" class="tb-btn">📍</sl-button></sl-tooltip>
+        <sl-tooltip content="整图缩放"><sl-button id="btnFit" size="small" class="tb-btn">⤢</sl-button></sl-tooltip>
+        <sl-tooltip content="导出 PNG 截图"><sl-button id="btnShot" size="small" class="tb-btn">⌗</sl-button></sl-tooltip>
+        <span class="spacer"></span>
+        <span id="hintBar"></span>
+      </header>
+      <div id="stage">
+        <div id="mapWrap"><canvas id="map"></canvas></div>
+        <aside id="panel"></aside>
+      </div>
+    </div>
+  </div>
+
+  <!-- 游戏内悬浮窗 HUD（?overlay=1 时启用） -->
+  <div id="hud">
+    <div id="hudMap"><canvas id="mapOv"></canvas></div>
+    <div id="hudBar">
+      <span class="hud-kv"><i>方位</i><b id="hudAz">—</b></span>
+      <span class="hud-kv"><i>距离</i><b id="hudDist">—</b></span>
+      <span class="hud-kv mil"><i>密位</i><b id="hudMil">—</b></span>
+      <span class="spacer"></span>
+      <sl-button size="small" id="hudPut">放炮位/目标</sl-button>
+      <sl-button size="small" variant="primary" id="hudCopy">复制口令</sl-button>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
