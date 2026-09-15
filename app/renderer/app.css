@@ -12,18 +12,40 @@
   --ink: #dde5ef;
   --ink-2: #93a1b4;
   --ink-3: #5d6b7d;
-  --acc: #f0a437;          /* 琥珀主色 */
+  --acc: #f0a437;          /* 琥珀主色。只用来做填充/边框，别直接当文字色 */
   --acc-ink: #1a1206;
   --ok: #4caf7d;
   --bad: #e05d5d;
   --warn: #e0a13d;
   --info: #5b9dd9;
+  /* 语义色的【文字】版本。深色主题下和填充色同值；浅色主题下必须换成压深的一档，
+     否则 #f0a437 这类亮色压在近白底上只有 2:1 左右——标题、导航选中态全糊掉。 */
+  --acc-text: var(--acc);
+  --ok-text: var(--ok);
+  /* 标记色：canvas 用的是 engine.js 里 MARK_COLORS 的具体色值（画在地图上，与主题无关），
+     同一批颜色被拿去当列表文字色时会随主题失配，所以列表里改走这组变量。 */
+  --mk-1:#e07070; --mk-2:#6ea3e0; --mk-3:#d9a24a; --mk-4:#b98ae0; --mk-5:#4fc2c2; --mk-6:#e0709e;
   --mono: 'Cascadia Code', ui-monospace, Consolas, monospace;
   --radius: 10px;
 }
 
 html { font-size: 14.5px; }
 html.sl-theme-dark { color-scheme: dark; }
+
+/* ---------- 图标（Lucide，内联 SVG sprite） ----------
+   fill/stroke 必须写成 CSS 而不是 SVG 属性：<use> 引用的是 symbol 的
+   影子树，颜色靠 CSS 继承自 <use> 所在元素，才能跟着主题色走。 */
+.ico {
+  width: 1em; height: 1em; flex: none;
+  fill: none; stroke: currentColor;
+  stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  vertical-align: -0.125em;
+}
+/* 中文标签前的图标留一点气口 */
+.btn .ico, .nav-btn .ico, sl-button .ico, .toolgrid .ico { margin-right: .38em; }
+.toolgrid .ico { margin-right: .3em; }
+/* 警示色图标（禁炸区 / 圈外警告） */
+.ico.bad { color: var(--bad); }
 
 body {
   margin: 0; height: 100vh; overflow: hidden;
@@ -61,7 +83,7 @@ body {
   transition: background .12s, color .12s;
 }
 .nav-btn:hover { background: var(--panel); color: var(--ink); }
-.nav-btn.on { background: var(--panel2); color: var(--acc); box-shadow: inset 2.5px 0 0 var(--acc); }
+.nav-btn.on { background: var(--panel2); color: var(--acc-text); box-shadow: inset 2.5px 0 0 var(--acc); }
 .nav-btn .ic { font-size: 15.5px; width: 20px; text-align: center; }
 .nav-btn small { margin-left: auto; font-size: 10px; color: var(--ink-3); }
 
@@ -82,7 +104,7 @@ body {
 .spacer { flex: 1; }
 .tb-btn { font-size: 15px; }
 #btnGrid::part(base), #btnPoi::part(base), #btnMarks::part(base), #btnFit::part(base), #btnShot::part(base) { padding: 4px 9px; }
-.tb-btn.on { color: var(--acc); }
+.tb-btn.on { color: var(--acc-text); }
 #hintBar { font-size: 11.5px; color: var(--ink-3); }
 
 #stage { flex: 1; display: flex; min-height: 0; }
@@ -102,12 +124,12 @@ body {
 }
 .card > h3 {
   margin: 0 0 10px; font-size: 12px; letter-spacing: 1.5px;
-  text-transform: uppercase; color: var(--acc);
+  text-transform: uppercase; color: var(--acc-text);
   display: flex; align-items: center; gap: 7px;
 }
 .card > h3::after { content: ''; flex: 1; height: 1px; background: var(--line); }
 .muted { color: var(--ink-2); font-size: 12px; line-height: 1.55; }
-.sect { margin: 0 0 10px; font-size: 12px; letter-spacing: 1.5px; color: var(--acc); text-transform: uppercase; }
+.sect { margin: 0 0 10px; font-size: 12px; letter-spacing: 1.5px; color: var(--acc-text); text-transform: uppercase; }
 
 /* 读数块 */
 .readout { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin: 10px 0; }
@@ -126,7 +148,7 @@ body {
   border: 1px solid rgba(240,164,55,.4); border-radius: 9px;
   padding: 9px 12px; margin: 10px 0;
 }
-.cmd .lb { font-size: 10.5px; color: var(--acc); letter-spacing: 1px; flex: none; }
+.cmd .lb { font-size: 10.5px; color: var(--acc-text); letter-spacing: 1px; flex: none; }
 .cmd b { font: 600 13px var(--mono); }
 
 .kv { margin-top: 10px; }
@@ -158,7 +180,7 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; }
 }
 .tbl td { padding: 6px 9px; border-bottom: 1px solid var(--line); font-family: var(--mono); }
 .tbl td:first-child { font-family: inherit; }
-.tbl tr.cur td { background: rgba(240,164,55,.14); color: var(--acc); font-weight: 600; }
+.tbl tr.cur td { background: rgba(240,164,55,.14); color: var(--acc-text); font-weight: 600; }
 .tbl tr.best td { background: rgba(76,175,125,.1); }
 .tblwrap { overflow-y: auto; border: 1px solid var(--line); border-radius: 9px; }
 
@@ -170,7 +192,7 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; }
   color: var(--ink-2); font: 500 12.5px inherit;
 }
 .toolgrid button:hover { border-color: var(--line2); color: var(--ink); }
-.toolgrid button.on { border-color: var(--acc); color: var(--acc); background: rgba(240,164,55,.08); }
+.toolgrid button.on { border-color: var(--acc-text); color: var(--acc-text); background: rgba(240,164,55,.08); }
 
 /* 分段选择（放炮位/放目标） */
 .seg { display: inline-flex; background: var(--bg); border: 1px solid var(--line); border-radius: 9px; padding: 3px; gap: 3px; margin-bottom: 11px; }
@@ -178,7 +200,7 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; }
   border: 0; background: none; color: var(--ink-2);
   padding: 6px 14px; border-radius: 6px; font: 500 12.5px inherit; cursor: pointer;
 }
-.seg button.on { background: var(--panel2); color: var(--acc); }
+.seg button.on { background: var(--panel2); color: var(--acc-text); }
 
 /* 行布局 */
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
@@ -198,10 +220,22 @@ sl-input[data-coord]::part(base) { font-family: var(--mono); }
 #legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; }
 
 /* 轻色主题微调 */
-body.light { --bg:#f2f4f7; --bg2:#e9edf2; --panel:#ffffff; --panel2:#f7f9fb; --line:#dde3ea; --line2:#c9d2dd; --ink:#1c2530; --ink-2:#4d5c6e; --ink-3:#8795a6; }
+body.light {
+  --bg:#f2f4f7; --bg2:#e9edf2; --panel:#ffffff; --panel2:#f7f9fb;
+  --line:#dde3ea; --line2:#c9d2dd;
+  --ink:#1c2530; --ink-2:#4d5c6e;
+  /* --ink-3 的深色原值 #8795a6 压在 --bg2 上只有 2.6:1，读起来是「有一行字但看不清」。
+     压深到 #79879a 后 3.1:1，仍是三档里最淡的一档，层级没塌。 */
+  --ink-3:#79879a;
+  --acc-text:#8a5a00;      /* 亮琥珀在白底上 2.09:1；深琥珀 5.6:1 */
+  --ok-text:#2f7a52;
+  --mk-1:#a3322c; --mk-2:#2a5f9e; --mk-3:#a8621a; --mk-4:#7a3f9d; --mk-5:#1c7a7a; --mk-6:#c2185b;
+}
 body.light #legend { color: #26303c; }
 
 /* ---------- 悬浮窗 HUD ---------- */
+/* 窗口本身是 transparent 的，页面底不能糊一层不透明底色，否则透不出去 */
+body.overlay { background: transparent; }
 body.overlay #app { display: none; }
 body.overlay #hud { display: flex; flex-direction: column; height: 100vh; }
 #hud { flex-direction: column; }
@@ -209,6 +243,26 @@ body.overlay #hud { display: flex; flex-direction: column; height: 100vh; }
 body:not(.overlay) #hud { display: none !important; }
 #hudMap { flex: 1; position: relative; min-height: 0; }
 #hudMap canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; }
+
+/* ---------- 指针坐标浮标 ----------
+   跟着指针走，在指针附近实时显示所在坐标（1 格 = 100 m）。
+   主窗与悬浮窗共用，浮标挂在各自 canvas 的定位父元素里。 */
+.cursor-tip {
+  position: absolute; z-index: 7;
+  pointer-events: none;               /* 绝不能挡住底下的拖拽与点击 */
+  padding: 2px 7px; border-radius: 6px;
+  /* 底色和文字必须【都】取自主题变量。之前底色写死成深色、文字用 var(--ink)，
+     而浅色主题下 --ink 本身是深色 → 深字压深底，整个浮标看不见，
+     表现出来就是「悬浮窗光标不带坐标」＋「浅色模式看不清」同一个 bug。 */
+  background: var(--panel);
+  border: 1px solid var(--line2);
+  color: var(--ink);
+  font: 500 11.5px/1.45 var(--mono);
+  white-space: nowrap;
+  box-shadow: 0 2px 10px rgba(0,0,0,.45);
+  transform: translate(13px, 13px);   /* 挪到指针右下，不压住准心 */
+}
+.cursor-tip[hidden] { display: none; }
 #hudBar {
   display: flex; align-items: center; gap: 10px;
   padding: 8px 12px; background: var(--panel); border-top: 1px solid var(--line);
@@ -218,7 +272,40 @@ body:not(.overlay) #hud { display: none !important; }
 .hud-kv { display: flex; align-items: baseline; gap: 6px; }
 .hud-kv i { font-style: normal; font-size: 10.5px; color: var(--ink-3); }
 .hud-kv b { font: 700 20px var(--mono); }
-.hud-kv.mil b { color: var(--acc); font-size: 24px; }
+.hud-kv.mil b { color: var(--acc-text); font-size: 24px; }
+
+/* ---------- 地图数据卡片（桌面版「数据」页） ---------- */
+.md-dir {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 9px;
+}
+.md-dir code {
+  flex: 1; min-width: 0; font: 11px var(--mono); color: var(--ink-2);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 7px;
+  padding: 6px 9px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  direction: rtl; text-align: left;      /* 路径太长时优先露出尾部（盘符+目录名） */
+}
+.md-row { margin-bottom: 9px; }
+.md-r1 { display: flex; align-items: baseline; gap: 8px; margin-bottom: 5px; }
+.md-r1 b { font-size: 12.5px; }
+.md-r1 .spacer { flex: 1; }
+.md-ok { color: var(--ok-text); font-size: 11px; font-weight: 600; }
+.md-bar {
+  height: 5px; background: var(--bg); border: 1px solid var(--line);
+  border-radius: 3px; overflow: hidden;
+}
+.md-bar > i { display: block; height: 100%; background: var(--ink-3); transition: width .3s; }
+.md-bar > i.live { background: var(--acc); }
+.md-z { display: flex; gap: 5px; margin-top: 6px; flex-wrap: wrap; }
+.md-zz {
+  font: 10px var(--mono); color: var(--ink-3); border: 1px solid var(--line);
+  border-radius: 5px; padding: 2px 5px;
+}
+.md-zz.on { color: var(--ok-text); border-color: var(--ok); }
+.md-zz i { font-style: normal; opacity: .7; margin-left: 3px; }
+.md-acts { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.md-job {
+  margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--line);
+}
 
 /* 滚动条 */
 ::-webkit-scrollbar { width: 9px; height: 9px; }
