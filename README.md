@@ -250,7 +250,7 @@ rustup target add x86_64-pc-windows-msvc    # 可选，cargo-xwin 也会自己�
 
 ### 开发与校验
 
-改完代码跑这几条，全绿再发布（后四条需要先 `node scripts/serve.js`）：
+改完代码跑这几条，全绿再发布（后五条需要先 `node scripts/serve.js`）：
 
 ```cmd
 node scripts/check_emoji.js       REM emoji 清零（逐码点扫描，含 U+FE0F 变体选择符）
@@ -258,6 +258,7 @@ node scripts/check_icons.js       REM 图标 sprite 无悬空引用
 node scripts/check_contrast.js    REM 文字对比度：<3:1 硬失败；3~4.5:1 只告警（刻意的次要色阶）
 node scripts/test_ballistics.js   REM 弹道 + 界面验收（网页版 / 桌面版 / 悬浮窗，127 项）
 node scripts/test_download.js     REM 下载进度条验收（取消 / 暂停 / 收尾，16 项）
+node scripts/test_map.js          REM 底图投影验收（瓦片铺在哪 / 两份数据是否一致，57 项）
 ```
 
 `--keep` 可保留生成的测试页便于排查。**新增界面行为时请顺手加断言**——这几条测试
@@ -266,6 +267,10 @@ node scripts/test_download.js     REM 下载进度条验收（取消 / 暂停 / 
 - `test_download.js` 用 `scripts/test/fake_tauri.js` 在模块加载前装上假 Tauri 桥，
   让 `IS_TAURI` 为真，从而覆盖 `desktop.js` 里那些「网页版直接退化成空操作」的分支。
   **它只覆盖渲染层**：Rust 侧的分片睡眠、取消标志何时被看到，要起真进程手工验。
+- `test_map.js` 拿不到磁盘上的瓦片也照样跑（它把瓦片图换成假图，一个字都不下载），
+  因为它验的不是「画得像不像」，而是**渲染层真正交给 `drawImage` 的矩形**铺在哪。
+  底图铺错范围是个静默故障：标点、网格、半径圈全都自洽，数值断言一个都拦不住，
+  只有盯住那个矩形才抓得住。**修过投影相关的东西，务必回跑这条。**
 - 对照度扫描器：低于 3:1 是硬失败（那个字号下无论多大都读不清），
   3~4.5:1 只报告不失败（次要文字本来就该比正文淡，强拉上去层级会塌）。
 
@@ -303,6 +308,10 @@ node scripts/make_app_icon.js     REM → app/src-tauri/icons/（改完图标要
   若有 `proto HIT` 但没有 `tile DISK`，多半是 `tiles` 目录指错了（「数据」页可看到当前目录并更换）。
 - **`Alt+X` 没反应**：多半被别的程序占了，看日志里 `Alt+X 注册失败`。
   托盘菜单的「悬浮窗 开/关」不受影响。
+- **底图糊、或者标点看着和地图对不上**：先跑 `node scripts/test_map.js`。
+  瓦片金字塔铺满的是**整个世界**（163.84 × 163.84，`tileBounds`），
+  可玩区 `bounds` 只是世界中间的一块；两者混用会让底图被放大 1.486 倍并平移，
+  表现是「糊」加上「Tower 的点落在塔旁边的野地里」，越靠边偏得越多。
 - **虚拟机 / 远程桌面白屏**：应用已内置 `--disable-gpu`（纯 2D 地图，没有性能损失）。
 - **改了渲染层但 exe 里没生效**：`renderer/` 是编译期打进二进制的，必须重跑 `build-exe.cmd`。
 - **`build-exe.cmd` 报「不是内部或外部命令」**：这个脚本被改成非 ASCII 或 LF 换行了，

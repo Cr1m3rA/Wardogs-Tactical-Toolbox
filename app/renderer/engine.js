@@ -238,13 +238,20 @@ export function createEngine(canvas, opts = {}){
   function s2w(px, py){
     return { x:(px - CW/2)/S.view.scale + S.view.cx, y:S.view.cy - (py - CH/2)/S.view.scale };
   }
+  /* 瓦片金字塔铺满的是「整个世界」tileBounds（0–163.84），不是可玩区 bounds
+     （bakurani 只有 110 见方、还偏在世界中间）。这两个混用会把整张底图放大
+     163.84/110.25 ≈ 1.486 倍再平移一段，表现就是「Tower 的点落在塔旁边的野地里，
+     而且越靠边偏得越多」——标点是按世界坐标画的，只有底图错位。
+     别再把这里的 tileBounds 换成 bounds。 */
+  function tileBox(){ return MAP().tileBounds; }
   function fitMap(){
+    /* 初始视野仍然取可玩区：世界四角大部分是打不到的地方，开局看那个没有意义。 */
     const b = MAP().bounds;
     S.view.cx = (b.minX+b.maxX)/2; S.view.cy = (b.minY+b.maxY)/2;
     S.view.scale = Math.min(CW/(b.maxX-b.minX), CH/(b.maxY-b.minY)) * 0.96;
   }
   function tileZoom(){
-    const b = MAP().bounds, t = MAP().tiles;
+    const b = tileBox(), t = MAP().tiles;
     const want = Math.log2((b.maxX-b.minX)*S.view.scale / t.tileSize);
     return Math.max(t.minZoom, Math.min(t.maxZoom, Math.ceil(want - 1e-6)));
   }
@@ -295,12 +302,12 @@ export function createEngine(canvas, opts = {}){
     ctx.fillText(txt, (CW-w)/2+10, 29);
   }
   function drawTiles(){
-    const m = MAP(), t = m.tiles, b = m.bounds;
+    const m = MAP(), t = m.tiles, b = tileBox();
     probeLocal(m);
     const tz = tileZoom();
     const n = Math.pow(2, tz);
     const tw = (b.maxX-b.minX)/n, th = (b.maxY-b.minY)/n;
-    const tl = w2s(b.minX, b.maxY);
+    const tl = w2s(b.minX, b.maxY);              // 瓦片 (0,0) 左上角 = 世界西北角
     const px = tw*S.view.scale, py = th*S.view.scale;
     if (px < 2 || py < 2) return;
     const x0 = Math.max(0, Math.floor((0 - tl.x)/px)), x1 = Math.min(n-1, Math.floor((CW - tl.x)/px));
@@ -947,7 +954,11 @@ export function createEngine(canvas, opts = {}){
   resize(); fitMap(); compute();
 
   return {
+    /* w2s/s2w/tileBox/tileZoom 导出是为了让 scripts/test_map.js 能拿着渲染层
+       自己的输出反查世界坐标——那条断言要能抓住「瓦片铺错范围」，就不能
+       在测试里把投影公式再抄一遍。 */
     S, MAP, MAPS, draw, fitMap, resize, run, compute, save,
+    w2s, s2w, tileBox, tileZoom,
     setMap(id){ S.mapId = id; tileFail = 0; tileOk = 0; fitMap(); draw(); save(); emit(); },
     weapon(){ return W(); },
     arc(){ return ARC(); },

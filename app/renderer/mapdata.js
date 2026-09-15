@@ -8,6 +8,12 @@ export default {
    "minY": 19.34,
    "maxY": 129.65
   },
+  "tileBounds": {
+   "minX": -0.03,
+   "maxX": 163.81,
+   "minY": -0.01,
+   "maxY": 163.83
+  },
   "tiles": {
    "path": "https://assets.wardogs-artillery.com/releases/assets-v1/maps/tiles/bakurani",
    "tileSize": 256,
@@ -146,6 +152,12 @@ export default {
    "minY": 21.81,
    "maxY": 99.56
   },
+  "tileBounds": {
+   "minX": -0.03,
+   "maxX": 163.81,
+   "minY": -0.01,
+   "maxY": 163.83
+  },
   "tiles": {
    "path": "https://assets.wardogs-artillery.com/releases/assets-v1/maps/tiles/ozeti",
    "tileSize": 256,
@@ -276,6 +288,12 @@ export default {
    "maxX": 124.89,
    "minY": 50.7,
    "maxY": 141.9
+  },
+  "tileBounds": {
+   "minX": -0.03,
+   "maxX": 163.81,
+   "minY": -0.01,
+   "maxY": 163.83
   },
   "tiles": {
    "path": "https://assets.wardogs-artillery.com/releases/assets-v1/maps/tiles/zestafona",
