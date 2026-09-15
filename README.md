@@ -217,7 +217,16 @@ tiles/  tile-conf/  ref/  .research/    本地素材与调研资料，.gitignore
 
 只有**桌面版**需要编译；网页版是纯静态文件，改完直接刷新浏览器。
 
-桌面版在 **WSL 内交叉编译出 Windows 的 MSVC 目标**，所以宿主机上不需要装 Visual Studio：
+**第一步：前端依赖。** 桌面版界面用的 Shoelace / Lit 走 `renderer/vendor/` 本地加载
+（运行零网络），但那个目录不入库，由 `postinstall` 从 `node_modules` 重建：
+
+```cmd
+cd app
+npm install
+```
+
+**第二步：WSL 工具链。** 桌面版在 **WSL 内交叉编译出 Windows 的 MSVC 目标**，
+所以宿主机上不需要装 Visual Studio：
 
 ```bash
 # 在 WSL（Ubuntu）里
@@ -226,15 +235,18 @@ cargo install cargo-xwin
 rustup target add x86_64-pc-windows-msvc    # 可选，cargo-xwin 也会自己拉
 ```
 
-然后在 Windows 侧双击 `build-exe.cmd`。首次约 5–10 分钟（要下 Windows SDK 头文件与全部依赖），
-之后增量构建很快。产物是单个 `WARDOGS-Toolbox.exe`，静态链接 CRT。
+**第三步：构建。** 在 Windows 侧双击 `build-exe.cmd`。首次约 5–10 分钟
+（要下 Windows SDK 头文件与全部依赖），之后增量构建很快。
+产物是单个 `WARDOGS-Toolbox.exe`，静态链接 CRT，约 9 MB。
+
+> 渲染层是**编译期**打进二进制的，`renderer/vendor/` 也一样。所以 `npm install`
+> 必须在 `build-exe.cmd` **之前**做——否则 vendor 是空的，exe 编得出来但界面起不来。
 
 > 为什么是 MSVC 而不是 GNU 目标：GNU 目标需要额外带一个 `WebView2Loader.dll`，
 > 那就不是一个单文件 exe 了。
 
-> **渲染层是编译期打进二进制的。** 改了 `app/renderer/` 下的任何东西都必须重跑
-> `build-exe.cmd`，光刷新窗口不会生效。网页版 `mortar-map.html` 是另一份实现，
-> 改一边不会同步到另一边。
+> 改了 `app/renderer/` 下的任何东西，光刷新窗口不会生效，必须重跑 `build-exe.cmd`。
+> 另外网页版 `mortar-map.html` 是**另一份实现**，改一边不会同步到另一边。
 
 ### 开发与校验
 
