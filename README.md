@@ -329,7 +329,6 @@ node scripts/make_app_icon.js     REM → app/src-tauri/icons/（修改图标后
 - [ ] 网页版与桌面版目前为**两份渲染层实现**，逻辑需人工同步。
       计划收敛为一份，网页版通过 `<script type="module">` 引用同一套 ESM。
 - [ ] GitHub Actions：打 tag 自动交叉编译 + 自动执行上述全部验收测试 + 发布 Release。
-- [ ] README 补充截图 / GIF（悬浮窗与标绘部分仅凭文字难以直观呈现）。
 - [ ] 支持更多武器与地图（射表由 `ref/weapons.json` 驱动，补充数据即可）。
 - [ ] 增加深色/浅色之外的**高对比主题**（现有两套主题均按 WCAG AA 调整，
       户外强光下的可读性尚未实测）。
