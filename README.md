@@ -83,8 +83,8 @@ tiles/                   本地瓦片（.gitignore 排除，不入库）
 ## 排障
 
 - 报 `Cannot read properties of undefined (reading 'requestSingleInstanceLock')`：当前终端设了 `ELECTRON_RUN_AS_NODE` 环境变量（常见于 IDE 内置终端），`unset ELECTRON_RUN_AS_NODE` 后再 `npm start`。
-- 虚拟机/远程桌面里 GPU 进程崩溃退出：加启动参数 `npx electron . --disable-gpu`。普通桌面环境无需。
-- 桌面 UI 改动后只见白屏：打开 DevTools（开发模式可在 main.js 里 `win.webContents.openDevTools()`）看控制台；多数是 import map 与 `renderer/vendor/npm/` 内包路径不匹配。
+- 虚拟机/远程桌面白屏或 GPU 崩溃：应用已内置 `disableHardwareAcceleration + disable-gpu + in-process-gpu`（纯 2D 地图无性能损失），正常情况不会再遇到；若仍有问题可加启动参数 `--disable-gpu` 反馈 issue。
+- 桌面 UI 改动后只见白屏：开发模式可在 main.js 里临时 `win.webContents.openDevTools()` 看控制台；多数是 import map 与 `renderer/vendor/npm/` 内包路径不匹配。
 
 ## 致谢
 
