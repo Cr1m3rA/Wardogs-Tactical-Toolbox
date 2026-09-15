@@ -1,0 +1,28 @@
+WARDOGS 战术工具箱 (WARDOGS Artillery Toolbox)
+Copyright 2026 Cr1m3rA
+
+本产品包含/依赖下列第三方作品，它们各自归原作者所有，
+不属于本项目，也不受本项目的 Apache-2.0 许可覆盖：
+
+1. 地图瓦片与游戏内影像
+   来源：WARDOGS 官方资源 CDN (https://assets.wardogs-artillery.com/)
+   版权：Bulkhead Interactive / WARDOGS 游戏资产
+   本仓库不打包、不再分发这些素材；程序仅在运行时按用户操作向该 CDN 请求，
+   并在本地缓存。是否使用请自行判断，风险由使用者承担。
+
+2. 射表 / 地图边界 / 地标坐标等实测数据
+   来源：apollyon-sys/wardogs-calculator (https://github.com/apollyon-sys/wardogs-calculator)
+   该项目的代码以 MIT 许可发布；其中的数值是社区测量值，
+   不是 Bulkhead 官方数据，本项目仅作整理与实装。
+
+3. 图标
+   来源：Lucide (https://lucide.dev/)
+   许可：ISC License，全文见 scripts/lucide/LICENSE
+   本项目按 ISC 的要求保留其版权与许可声明。
+
+4. 界面组件运行时
+   来源：Shoelace (https://shoelace.style/)、Lit (https://lit.dev/)
+   许可：MIT，随 renderer/vendor/ 一并分发（该目录由 npm install 重建，不入库）。
+
+本项目与 Bulkhead Interactive 及 WARDOGS 开发组无任何隶属关系，
+未获其授权、赞助或认可。"WARDOGS" 及相关名称为其各自所有者的商标。

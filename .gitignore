@@ -3,6 +3,9 @@ tiles/
 tile-conf/
 ref/
 
+# 调研时抓下来的第三方页面/数据（含别家的 HTML 和 emoji），只作本地参考
+.research/
+
 # Node / 打包产物
 node_modules/
 dist/
@@ -11,6 +14,32 @@ app/dist/
 # renderer/vendor 由 postinstall 从 node_modules 重建，不入库
 app/renderer/vendor/
 
-# 杂项
+# Tauri 构建中间物
+app/src-tauri/target/
+app/src-tauri/gen/
+
+# 编译产物：走 GitHub Releases 分发，不进仓库
+# （二进制每次重编译都会让仓库再涨约 9 MB，且历史里永远删不掉）
+WARDOGS-Toolbox.exe
+
+# 由 scripts/gen_urls.py 生成，一条命令即可复现（详见 README）
+scripts/urls.txt
+scripts/aria2.txt
+
+# Python 缓存
+__pycache__/
+*.pyc
+
+# 运行时生成：配置与诊断日志都在 exe 同级
+wardogs-config.json
+wardogs-debug.log
 *.log
+
+# 杂项
 .DS_Store
+.spike-test/
+
+# 本地规划稿（已放弃的小程序方案留档，含本机绝对路径），不随开源发布
+# 注：Git for Windows 在这台机器上根本列不出中文名文件，这里是显式排除，
+# 免得换台机器 clone 时它又被当成待提交文件冒出来
+小程序开发计划.md

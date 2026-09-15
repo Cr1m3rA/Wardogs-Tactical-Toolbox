@@ -1,0 +1,18 @@
+# 统一换行符，免得在不同平台上 clone 出来跑不了。
+#
+# 重点在 *.cmd：cmd.exe 解析 LF-only 的批处理文件会出错——它不会报「换行不对」，
+# 而是把 REM 注释的后半截当成命令去执行，报一堆「不是内部或外部命令」，
+# 让人以为是路径或环境有问题。这个坑踩过一次，用 .gitattributes 钉死。
+
+# 其余一律 LF：仓库里存什么，各平台就检出什么，不会因为谁的 core.autocrlf
+# 设成 true 就在工作区里凭空多出一堆换行符改动。
+* text=auto eol=lf
+
+*.cmd  text eol=crlf
+*.bat  text eol=crlf
+
+# 这些是二进制，别动
+*.png  binary
+*.ico  binary
+*.webp binary
+*.exe  binary

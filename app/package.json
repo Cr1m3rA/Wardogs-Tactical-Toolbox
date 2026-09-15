@@ -3,8 +3,8 @@
   "version": "1.1.0",
   "description": "WARDOGS 战术工具箱桌面版：迫击炮诸元 / 测距标绘 / 建造规划，支持游戏内悬浮窗（不接触游戏内存，反作弊安全）",
   "main": "main.js",
-  "license": "MIT",
-  "author": "Jerry",
+  "license": "Apache-2.0",
+  "author": "Cr1m3rA",
   "scripts": {
     "postinstall": "node scripts/vendor.js",
     "start": "electron .",
@@ -25,7 +25,7 @@
     "lit": "^3.3.3"
   },
   "build": {
-    "appId": "com.jerry.wardogs.artillery-toolbox",
+    "appId": "com.cr1m3ra.wardogs.artillery-toolbox",
     "productName": "WARDOGS 战术工具箱",
     "files": [
       "main.js",
