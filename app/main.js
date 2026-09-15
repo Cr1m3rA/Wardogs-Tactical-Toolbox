@@ -11,7 +11,7 @@
  * UI：renderer/ 下的全新桌面界面（Shoelace 组件库，本地打包无网络依赖）。
  * 地图：默认云端瓦片（?src=cdn），不随应用打包任何游戏素材。
  * ===================================================================== */
-const { app, BrowserWindow, globalShortcut, Tray, Menu, nativeImage, protocol } = require('electron');
+const { app, BrowserWindow, globalShortcut, Tray, Menu, nativeImage, protocol, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -59,8 +59,24 @@ function createMain() {
   win.on('closed', () => { win = null; });
 }
 
+/* ---------- 悬浮窗位置记忆（userData 下的 JSON） ---------- */
+function loadOverlayBounds() {
+  try {
+    const b = JSON.parse(fs.readFileSync(path.join(app.getPath('userData'), 'overlay-bounds.json'), 'utf8'));
+    if (!b || b.width < 320 || b.height < 300) return null;
+    const wa = screen.getPrimaryDisplay().workArea;   // 防止存了个屏幕外坐标
+    b.x = Math.max(wa.x, Math.min(b.x, wa.x + wa.width - 140));
+    b.y = Math.max(wa.y, Math.min(b.y, wa.y + wa.height - 100));
+    return b;
+  } catch { return null; }
+}
+function saveOverlayBounds(b) {
+  try { fs.writeFileSync(path.join(app.getPath('userData'), 'overlay-bounds.json'), JSON.stringify(b)); } catch {}
+}
+
 function createOverlay() {
-  overlay = new BrowserWindow(winOpts({
+  const saved = loadOverlayBounds();
+  overlay = new BrowserWindow(winOpts(Object.assign({
     width: 560, height: 820, minHeight: 420, minWidth: 380,
     frame: false,            // 无边框
     transparent: true,       // 透明
@@ -68,9 +84,13 @@ function createOverlay() {
     skipTaskbar: true,       // 不占任务栏
     hasShadow: true,
     title: 'WARDOGS 悬浮窗',
-  }));
+  }, saved ? { x: saved.x, y: saved.y, width: saved.width, height: saved.height } : {})));
   overlay.setAlwaysOnTop(true, 'screen-saver');
   overlay.loadURL(createPageURL('?src=cdn&overlay=1'));
+  /* 移动 / 缩放后记住位置尺寸 */
+  const persist = () => { if (overlay && !overlay.isDestroyed()) saveOverlayBounds(overlay.getBounds()); };
+  overlay.on('moved', persist);
+  overlay.on('resized', persist);
   /* Esc 隐藏悬浮窗 */
   overlay.webContents.on('before-input-event', (e, input) => {
     if (input.type === 'keyDown' && input.key === 'Escape') overlay.hide();

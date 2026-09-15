@@ -210,6 +210,7 @@ function viewPredict(){
     <h3>炮位 + 方位 + 密位 → 落点</h3>
     <p class="muted" style="margin:0 0 10px">炮位与「算诸元」共用，${S.mortar ? '已设' : '未设——先放炮位'}。地图上点两下可快速试方向。</p>
     <div class="row2">${coordPair('pmx','pmy','炮位',S.mortar)}</div>
+    <sl-input id="pIns2" class="paste" size="small" placeholder="粘贴炮位坐标：x83.64, y72.85"></sl-input>
     <div class="row2" style="margin-top:9px">
       ${coordField('paz','方位角 °（0=北 90=东）', S.predAz)}
       ${coordField('prng','或 RNG 距离 m', S.predRng)}
@@ -581,6 +582,12 @@ function bindPanel(){
     if (S.put === 'target') S.target = v; else S.mortar = v;
     E.compute(); E.draw(); E.save(); scheduleRender();
   });
+  const pIns2 = $('pIns2');
+  if (pIns2) pIns2.addEventListener('sl-input', () => {
+    const v = parsePair(pIns2.value); if (!v) return;
+    S.mortar = v;
+    E.compute(); E.draw(); E.save(); scheduleRender();
+  });
   const btnSolve = $('btnSolve');
   if (btnSolve) btnSolve.addEventListener('click', () => {
     E.compute();
@@ -731,9 +738,13 @@ function bindPanel(){
 function renderHud(){
   const S = E.S;
   const r = S.results.solve;
-  $('hudAz').textContent = r && !r.err ? faz(r.az) : '—';
-  $('hudDist').textContent = r && !r.err ? fm0(r.dist) + 'm' : '—';
-  $('hudMil').textContent = r && !r.err ? fm0(r.milR) : '—';
+  const ok = r && !r.err;
+  const bad = ok && r.nf;                       // 落点在禁炸区 → HUD 红色警示
+  $('hudAz').textContent = ok ? faz(r.az) : '—';
+  $('hudDist').textContent = ok ? fm0(r.dist) + 'm' : '—';
+  $('hudMil').textContent = ok ? fm0(r.milR) : '—';
+  $('hudMil').style.color = bad ? 'var(--bad)' : '';
+  $('hudDist').textContent = ok ? (fm0(r.dist) + 'm' + (bad ? ' 🚫' : '')) : '—';
   $('hudPut').textContent = S.put === 'target' ? '放目标' : '放炮位';
 }
 if (isOverlay){
